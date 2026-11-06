@@ -1,3 +1,7 @@
+import '../core/api.js';
+import '../core/shell.js';
+import '../core/panels.js';
+import '../core/ui.js';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import StudentEvaluationApp from '../components/student/StudentEvaluationApp';

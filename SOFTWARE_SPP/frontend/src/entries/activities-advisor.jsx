@@ -1,3 +1,7 @@
+import '../core/api.js';
+import '../core/shell.js';
+import '../core/panels.js';
+import '../core/custom-select.js';
 import { mountActivities } from './activities-mount';
 import { mountPanelCommon } from './panel-common-mount';
 

@@ -1,19 +1,5 @@
 /* =========================================================================
    reports-kit.js — Building blocks of the Reports panel (Director).
-
-   Same visual language as the Evaluations dashboard (classes .dv-*): KPI tiles, cards with a CSS chart and a
-   "View table" switch, stacked bars, horizontal bars and column charts. No chart library: the CSP only allows
-   our own scripts, and plain HTML/CSS charts print well.
-
-   Every card that has data registers a "dataset" ({ id, title, columns, rows }) in a registry, so the same
-   information can be shown as a chart, as a table and exported (Excel, CSV, JSON, PDF).
-
-     SPP.reportKit.h(tag, attrs, ...children)
-     SPP.reportKit.kpis(tab, id, title, items)             KPI tiles (+ dataset)
-     SPP.reportKit.card(tab, dataset, { sub, chart, wide, note })
-     SPP.reportKit.stack / hbars / columns / table / empty
-     SPP.reportKit.openExport(options)                      export dialog
-     SPP.reportKit.printSheet({ title, subtitle, datasets, mode })
    ========================================================================= */
 (function () {
     'use strict';
@@ -33,7 +19,6 @@
     const day = (value) => (value ? String(value).slice(0, 10) : '—');
 
     // ------------------------------------------------------------------ DOM
-    /** h('div', { class: 'x', onclick: fn, 'data-tip': 'text' }, 'text', otherNode, [list]) */
     function h(tag, attrs, ...children) {
         const el = document.createElement(tag);
         Object.entries(attrs || {}).forEach(([key, value]) => {
@@ -56,8 +41,8 @@
     const icon = (classes) => h('i', { class: classes, 'aria-hidden': 'true' });
     const clear = (el) => { while (el.firstChild) el.removeChild(el.firstChild); return el; };
 
-    // ------------------------------------------------------------------ dataset registry (one entry per report tab)
-    const registry = new Map(); // tab -> { label, datasets: Map(id -> dataset) }
+    // ------------------------------------------------------------------ dataset registry
+    const registry = new Map();
     function resetTab(tab, label) {
         registry.set(tab, { label: label || tab, datasets: new Map() });
     }
@@ -70,7 +55,6 @@
     // ------------------------------------------------------------------ charts
     const empty = (text, ic) => h('div', { class: 'dv-empty' }, icon(ic || 'fa-regular fa-folder-open'), text);
 
-    /** Table. columns: [{ key, label, num, render(value,row) }] */
     function table(columns, rows, options) {
         const o = options || {};
         if (!rows || !rows.length) return empty(o.empty || 'There is no data yet.');
@@ -87,7 +71,6 @@
                 }))))));
     }
 
-    /** One stacked bar. parts: [{ label, value, cls }] (cls: dv-s1 | dv-s2 | dv-s3 | rp-s4). */
     function stack(parts, options) {
         const o = options || {};
         const total = parts.reduce((sum, p) => sum + (Number(p.value) || 0), 0);
@@ -102,7 +85,6 @@
                 h('i', { class: 'dv-key ' + p.cls }), p.label + ' ', h('b', {}, fmt(p.value)), ' (' + fmt(p.value / total * 100) + ' %)'))));
     }
 
-    /** Horizontal bars. items: [{ label, value, text, tip, cls }] */
     function hbars(items, options) {
         const o = options || {};
         if (!items || !items.length) return empty(o.empty || 'There is no data yet.');
@@ -114,10 +96,6 @@
             h('span', { class: 'dv-hrow-val' }, i.text || fmt(i.value, 2)))));
     }
 
-    /**
-     * Column chart (one or several series per label).
-     * labels: ['Jan 26', ...]  series: [{ name, cls, values: [] }]  options: { tight, passBefore: index, empty }
-     */
     function columns(labels, series, options) {
         const o = options || {};
         const max = Math.max(0, ...series.flatMap((s) => s.values.map((v) => Number(v) || 0)));
@@ -140,14 +118,12 @@
     }
 
     // ------------------------------------------------------------------ KPI tiles and cards
-    /** KPI tiles (markup only). items: [{ icon, value, label, sub, attn }] */
     function kpiGrid(items, extraClass) {
         return h('div', { class: 'dv-kpis ' + (extraClass || '') }, items.map((k) => h('div', { class: 'dv-kpi' + (k.attn ? ' dv-kpi--attn' : '') },
             h('div', { class: 'dv-kpi-icon' }, icon(k.icon)),
             h('div', { class: 'dv-kpi-body' }, h('span', { class: 'dv-kpi-value' + (String(k.value).length > 8 ? ' rp-kpi-text' : '') }, k.value), h('span', { class: 'dv-kpi-label' }, k.label), k.sub ? h('span', { class: 'dv-kpi-sub' }, k.sub) : null))));
     }
 
-    /** KPI tiles that are also exportable. items: [{ icon, value, label, sub, attn, raw }]  raw = numeric value used for the export */
     function kpis(tab, id, title, items) {
         const grid = kpiGrid(items, 'rp-kpis');
         grid.setAttribute('data-ds', tab + ':' + id);
@@ -158,10 +134,6 @@
         return grid;
     }
 
-    /**
-     * Card with a chart and, behind the "View table" button, the same data as a table.
-     * dataset: { id, title, columns, rows }  — registered for export unless dataset.noExport.
-     */
     function card(tab, dataset, options) {
         const o = options || {};
         const chart = h('div', { class: 'rp-chart' }, o.chart);
@@ -184,15 +156,6 @@
     }
 
     // ------------------------------------------------------------------ export dialog
-    /**
-     * options: {
-     *   title, subtitle,
-     *   filters: [{ id, label, options: [{ value, label }] }]      optional groups of checkboxes (e.g. programs)
-     *   sections: [{ id, label, hint, group }]                      what to include
-     *   build({ sections: Set, filters: { [id]: Set }, format }) -> { datasets, base, title, subtitle, json?, mode? }
-     *   formats: ['xlsx','csv','json','pdf']                        default: all
-     * }
-     */
     const FORMATS = {
         xlsx: { label: 'Excel', ext: '.xlsx', ic: 'fa-solid fa-file-excel', hint: 'One sheet per item' },
         csv: { label: 'CSV', ext: '.csv / .zip', ic: 'fa-solid fa-file-csv', hint: 'Plain text; .zip if several' },
@@ -304,8 +267,6 @@
         const first = box.querySelector('input'); if (first) first.focus();
     }
 
-    // ------------------------------------------------------------------ running an export
-    /** Raw JSON of datasets: { id: { title, rows: [...] } } with the column keys of each dataset. */
     function datasetsToJson(datasets) {
         return Object.fromEntries(datasets.map((d) => [d.id, { title: d.title, columns: d.columns.map((c) => c.label), rows: d.rows }]));
     }
@@ -319,8 +280,8 @@
                 E.download(E.fileName(base, 'xlsx'), E.xlsx(datasets));
                 break;
             case 'csv':
-                if (datasets.length === 1) E.download(E.fileName(base, 'csv'), new Blob(['﻿' + E.csv(datasets[0])], { type: 'text/csv;charset=utf-8' }));
-                else E.download(E.fileName(base, 'zip'), E.zip(datasets.map((d) => ({ name: E.slug(d.title || d.id) + '.csv', data: '﻿' + E.csv(d) }))));
+                if (datasets.length === 1) E.download(E.fileName(base, 'csv'), new Blob(['\ufeff' + E.csv(datasets[0])], { type: 'text/csv;charset=utf-8' }));
+                else E.download(E.fileName(base, 'zip'), E.zip(datasets.map((d) => ({ name: E.slug(d.title || d.id) + '.csv', data: '\ufeff' + E.csv(d) }))));
                 break;
             case 'json': {
                 const payload = job.json || { title: job.title || base, generatedAt: new Date().toISOString(), data: datasetsToJson(datasets) };
@@ -335,12 +296,6 @@
         }
     }
 
-    // ------------------------------------------------------------------ print / PDF
-    /**
-     * Builds a printable sheet and opens the browser print dialog ("Save as PDF").
-     * mode 'panel'  : the same cards (charts) the director sees, without the "View table" buttons.
-     * mode 'tables' : every dataset as a plain table.
-     */
     function buildSheet(options) {
         const mode = options.mode || 'panel';
         const sheet = h('div', { class: 'rp-sheet dv-wrapper', 'aria-hidden': 'true' },
@@ -350,7 +305,6 @@
         options.datasets.forEach((d) => {
             if (mode === 'panel' && d.node) {
                 const copy = d.node.cloneNode(true);
-                // the sheet always shows the chart (never the alternate table view the director may have opened)
                 copy.querySelectorAll('.dv-toggle, .rp-tableview').forEach((n) => n.remove());
                 copy.querySelectorAll('.rp-chart[hidden]').forEach((n) => { n.hidden = false; });
                 copy.querySelectorAll('[tabindex]').forEach((n) => n.removeAttribute('tabindex'));
@@ -382,12 +336,9 @@
             window.removeEventListener('afterprint', cleanup);
         };
         window.addEventListener('afterprint', cleanup);
-        // let the browser lay the sheet out before opening the dialog
         setTimeout(() => window.print(), 80);
     }
 
-    // ------------------------------------------------------------------ section header with the usual buttons
-    /** Toolbar of a tab: matching the Evaluations panel style (dv-head + dv-help). */
     function toolbar(options) {
         const frag = document.createDocumentFragment();
 

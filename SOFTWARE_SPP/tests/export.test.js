@@ -1,12 +1,12 @@
 'use strict';
-// Unit test of public/js/core/export.js (XLSX / CSV / ZIP writers used by the Reports panel). No browser needed.
+// Unit test of frontend/src/core/export.js (XLSX / CSV / ZIP writers used by the Reports panel). No browser needed.
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
 global.window = {};
-const exporter = require('../public/js/core/export');
+let exporter;
 
 let passed = 0;
 async function test(name, fn) {
@@ -50,6 +50,7 @@ const dataset = {
 };
 
 (async () => {
+  exporter = (await import('../frontend/src/core/export.js')).default;
   console.log('# export.js');
   await test('csv: quotes, commas, line breaks, UTF-8 and formula-injection guard', () => {
     const text = exporter.csv(dataset);

@@ -29,7 +29,6 @@
     const h = UI.h;
 
     UI.icon = (cls) => h('i', { class: cls, 'aria-hidden': 'true' });
-    /** Como append(), pero ignora null/undefined/false (append() los escribiría como texto). */
     UI.add = (el, ...nodos) => { nodos.flat().forEach((n) => { if (n !== null && n !== undefined && n !== false) el.append(n); }); return el; };
     UI.clear = (el) => { if (!el) return el; while (el.firstChild) el.removeChild(el.firstChild); return el; };
     UI.$ = (sel, root) => (root || document).querySelector(sel);

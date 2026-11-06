@@ -11,7 +11,7 @@ const { apiNotFound, errorHandler } = require('./middlewares/error.middleware');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 /** Public asset folders. The `pages` folder is deliberately NOT served statically (it is role-protected). */
-const STATIC_FOLDERS = ['css', 'js', 'img', 'dist'];
+const STATIC_FOLDERS = ['css', 'img', 'dist'];
 
 /** Builds the Express application (no port is opened here, which makes it easy to test). */
 function createApp(container = createContainer()) {

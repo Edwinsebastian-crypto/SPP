@@ -1,3 +1,8 @@
+import '../core/api.js';
+import '../core/shell.js';
+import '../core/panels.js';
+import '../core/custom-select.js';
+import '../core/ui.js';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import TutorEvaluationApp from '../components/tutor/TutorEvaluationApp';

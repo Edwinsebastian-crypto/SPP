@@ -10,7 +10,7 @@
    ========================================================================= */
 (function () {
     'use strict';
-    const SPP = window.SPP;
+    const SPP = window.SPP || (window.SPP = {});
 
     const VISIBLE_ROWS = 5;
     let scrollLockHost = null;
@@ -428,7 +428,6 @@
         rebuild(select);
     };
 
-    // Global listeners (registered once)
     document.addEventListener('click', closeAll);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });
     window.addEventListener('resize', () => { if (!usesOverlaySheet()) closeSheet(); });

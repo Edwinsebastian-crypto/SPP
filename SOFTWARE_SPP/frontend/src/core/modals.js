@@ -2,12 +2,6 @@
    modals.js — In-app modals shared by every panel.
    Replaces the browser's native alert()/confirm() with the same "am-modal"
    design the tutor panel uses (create / edit / delete confirmations).
-
-     await SPP.modals.alert({ title, message, rows, icon, acceptLabel });
-     const yes = await SPP.modals.confirm({ title, message, confirmLabel, cancelLabel });
-
-   The modals are created the first time they are used (same approach as
-   SPP.showError in api.js), so a page only pays for what it shows.
    ========================================================================= */
 (function () {
     'use strict';
@@ -36,7 +30,6 @@
         if (overlay === confirmOverlay && resolveConfirm) { const done = resolveConfirm; resolveConfirm = null; done(false); }
     }
 
-    /** Builds one overlay; reused on every call. */
     function build(kind) {
         const overlay = document.createElement('div');
         overlay.className = 'am-modal-overlay';
@@ -79,7 +72,6 @@
         return overlay;
     }
 
-    /** Title + message (+ optional label/value rows) with a single Accept button. */
     function alertModal({ title, message, rows, icon, acceptLabel } = {}) {
         return new Promise((resolve) => {
             const overlay = root('alert');
@@ -104,7 +96,6 @@
         });
     }
 
-    /** Cancel / Confirm; resolves `true` only when the user confirms. */
     function confirmModal({ title, message, confirmLabel, cancelLabel, danger } = {}) {
         return new Promise((resolve) => {
             const overlay = root('confirm');

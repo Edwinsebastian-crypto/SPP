@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 
 <head>
@@ -169,8 +169,8 @@
 						<h2 id="logbook-title" class="logbook-title">Practice <span class="lb-student-name"
 								aria-label="View student credentials"></span></h2>
 					</div>
-					<!-- BANNER DE CALIFICACIÓN Y OBSERVACIÓN -->
-					<div class="lb-hero-banner is-loading" id="lb-hero-banner" style="cursor: pointer;" title="Haz clic para editar la calificación y observación">
+					<!-- BANNER DE CALIFICACIÃ“N Y OBSERVACIÃ“N -->
+					<div class="lb-hero-banner is-loading" id="lb-hero-banner" style="cursor: pointer;" title="Haz clic para editar la calificaciÃ³n y observaciÃ³n">
 						<div class="lb-hero-left">
 							<div class="lb-score-ring" id="lb-score-ring">
 								<svg class="lb-ring-svg" viewBox="0 0 88 88" aria-hidden="true">
@@ -178,13 +178,13 @@
 									<circle class="lb-ring-fill" id="lb-ring-fill" cx="44" cy="44" r="36" />
 								</svg>
 								<div class="lb-ring-content">
-									<span class="lb-score-val" id="lb-score-val">—</span>
+									<span class="lb-score-val" id="lb-score-val">â€”</span>
 									<span class="lb-score-max">OF 5.0</span>
 								</div>
 							</div>
 							<div class="lb-grade-info">
 								<span class="lb-grade-kicker">FINAL GRADE</span>
-								<h3 class="lb-grade-title" id="lb-grade-title">—</h3>
+								<h3 class="lb-grade-title" id="lb-grade-title">â€”</h3>
 							</div>
 						</div>
 
@@ -195,14 +195,14 @@
 									<i class="fa-solid fa-pen-to-square" style="color: #8ec3ab; font-size: 13px;" title="Edit logbook"></i>
 								</div>
 								<div class="lb-obs-text-wrap">
-									<span class="lb-obs-quote" aria-hidden="true">”</span>
-									<p class="lb-obs-text" id="lb-obs-text">—</p>
+									<span class="lb-obs-quote" aria-hidden="true">â€</span>
+									<p class="lb-obs-text" id="lb-obs-text">â€”</p>
 								</div>
 							</div>
 						</div>
 					</div>
 
-					<!-- Formulario de edición de calificación y observación para el tutor -->
+					<!-- Formulario de ediciÃ³n de calificaciÃ³n y observaciÃ³n para el tutor -->
 					<div id="tutor-logbook-edit-form" style="display: none; background: #ffffff; border-radius: 16px; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 4px 18px rgba(0,0,0,0.06); border: 1px solid rgba(0,0,0,0.06);">
 						<h4 style="margin: 0 0 16px 0; font-family: var(--font-sans); color: #103323; font-size: 16px;">Edit Grade and Observation</h4>
 						<div style="display: grid; grid-template-columns: 140px 1fr; gap: 16px; margin-bottom: 16px;">
@@ -243,7 +243,7 @@
 							</div>
 						</div>
 
-						<!-- Tarjeta 2: Sección de preguntas -->
+						<!-- Tarjeta 2: SecciÃ³n de preguntas -->
 						<div class="lb-card" id="lb-card-questions" role="button" tabindex="0">
 							<div class="lb-card-top">
 								<div class="lb-card-icon" aria-hidden="true">
@@ -269,7 +269,7 @@
 					style="display: none;">
 					<div class="activities-header">
 						<button type="button" class="activities-back-btn" id="activitiesBack"
-							aria-label="Volver a Información de la Práctica">
+							aria-label="Volver a InformaciÃ³n de la PrÃ¡ctica">
 							<i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
 						</button>
 						<h2 id="activities-title" class="activities-title">Activities</h2>
@@ -362,7 +362,7 @@
 									</div>
 									<button type="button" class="ev-btn ev-btn--primary" id="btn-nueva"><i class="fa-solid fa-plus"></i>New evaluation</button>
 								</div>
-								<div class="ev-stack" id="lista-contenido"><p class="ev-loading">Loading…</p></div>
+								<div class="ev-stack" id="lista-contenido"><p class="ev-loading">Loadingâ€¦</p></div>
 							</div>
 						</section>
 
@@ -415,7 +415,7 @@
 						</button>
 						<h2 id="evidences-title" class="evidences-title">Activity</h2>
 
-						<!-- Menú de la actividad -->
+						<!-- MenÃº de la actividad -->
 						<div class="ev-menu-wrapper" id="act-main-menu" style="margin-left: auto;">
 							<button type="button" class="ev-menu-btn" aria-label="Opciones de actividad"
 								aria-expanded="false">
@@ -483,7 +483,7 @@
 
 					<h3 class="feedback-title" style="margin: 10px 0 20px 0;">Activity Evidence</h3>
 
-					<!-- SECCIÓN DE RETROALIMENTACIONES -->
+					<!-- SECCIÃ“N DE RETROALIMENTACIONES -->
 					<div class="feedback-section">
 						<h3 class="feedback-title">Feedback</h3>
 
@@ -540,7 +540,7 @@
 							<div class="feedback-input-wrapper">
 								<textarea class="feedback-textarea" placeholder="Enter the text..."></textarea>
 								<button type="button" class="feedback-btn-submit"
-									aria-label="Enviar Retroalimentación"><i
+									aria-label="Enviar RetroalimentaciÃ³n"><i
 										class="fa-solid fa-paper-plane"></i></button>
 							</div>
 							<div class="feedback-actions">
@@ -728,11 +728,6 @@
 			<div id="lb-modal-credential-body"></div>
 		</div>
 	</div>
-	<script src="../js/core/api.js"></script>
-	<script src="../js/core/shell.js"></script>
-	<script src="../js/core/panels.js"></script>
-	<script src="../js/core/custom-select.js"></script>
-	<script src="../js/core/ui.js"></script>
 	<script type="module" src="../dist/evaluacion-tutor.js"></script>
 </body>
 

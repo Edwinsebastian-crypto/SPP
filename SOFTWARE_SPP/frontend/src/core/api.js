@@ -5,7 +5,7 @@
    ========================================================================= */
 (function () {
     'use strict';
-    const SPP = {};
+    const SPP = window.SPP || {};
 
     /* ------------------------------------------------------------------
        Global "wait" cursor. Any save/upload (POST/PUT/PATCH/DELETE)

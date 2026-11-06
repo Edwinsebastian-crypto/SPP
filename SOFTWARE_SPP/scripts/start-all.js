@@ -11,7 +11,7 @@ const { spawn, execSync } = require('child_process');
 const ROOT = path.join(__dirname, '..');
 const SERVICE_DIR = path.join(ROOT, '..', 'servicio_evaluacion', 'backend');
 const NOTIF_DIR = path.join(ROOT, '..', 'servicio_notificaciones');
-const FRONTEND_DIR = path.join(ROOT, '..', 'frontend');
+const FRONTEND_DIR = path.join(ROOT, 'frontend');
 const DOCKER_COMPOSE_FILE = path.join(ROOT, '..', 'servicio_evaluacion', 'docker-compose.yml');
 const venvPython = path.join(SERVICE_DIR, '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
 

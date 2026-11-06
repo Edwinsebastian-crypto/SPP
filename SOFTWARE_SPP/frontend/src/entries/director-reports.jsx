@@ -1,3 +1,11 @@
+import '../core/api.js';
+import '../core/shell.js';
+import '../core/custom-select.js';
+import '../core/panels.js';
+import '../core/modals.js';
+import '../core/ui.js';
+import '../core/export.js';
+import '../core/reports-kit.js';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import DirectorPracticeEvaluationsApp from '../components/director/DirectorPracticeEvaluationsApp';

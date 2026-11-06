@@ -1,13 +1,13 @@
 /* =========================================================================
    panels.js — Panel navigation shared by the Student, Tutor, Advisor and
-   Director views (previously copy-pasted in each page script).
+   Director views.
 
    Flow:  practice -> logbook -> activities -> evidence
                           \-> questions (student / tutor)
    ========================================================================= */
 (function () {
     'use strict';
-    const SPP = window.SPP;
+    const SPP = window.SPP || (window.SPP = {});
     const byId = (id) => document.getElementById(id);
 
     /** Scrolls every scrollable ancestor back to the top (the page, the wrapper and the shell). */
@@ -95,15 +95,6 @@
     }
 
     // ---------------------------------------------------------------- standard panel flow
-    /**
-     * Wires the navigation of the practice panels.
-     * options.questions:
-     *   'none'        — no questions section (advisor)
-     *   'student'     — "My practice questions" panel
-     *   'tutor'       — question bank panel
-     *   'placeholder' — section still under construction (director)
-     * options.scope: CSS selector of the section that contains the practice panel (director: '#practice').
-     */
     function wireStandardFlow(options) {
         const o = Object.assign({ questions: 'none', scope: '' }, options);
         const scoped = (selector) => document.querySelector((o.scope ? o.scope + ' ' : '') + selector);
@@ -116,7 +107,6 @@
         const evidencesTitle = byId('evidences-title');
         const questionsPanel = byId('questions-panel');
 
-        // The logbook panel has one action button per section: [activities, questions]
         const logbookButtons = logbookPanel ? logbookPanel.querySelectorAll('.lb-action-btn') : [];
         const questionButtons = questionsPanel ? questionsPanel.querySelectorAll('.lb-action-btn') : [];
 
@@ -126,7 +116,6 @@
         link(byId('activitiesBack'), activitiesPanel, logbookPanel);
         link(byId('evidencesBack'), evidencesPanel, activitiesPanel);
 
-        // Every activity button (#1 to #6) opens the evidence panel
         const activityButtons = (o.scope ? document.querySelector(o.scope) : document).querySelectorAll('.activity-enter-btn');
         activityButtons.forEach((button, index) => {
             button.addEventListener('click', () => {
@@ -169,7 +158,6 @@
         });
     }
 
-    // Close any open "..." menu when clicking anywhere else
     document.addEventListener('click', () => closeAllMenus(null));
 
     SPP.panels = { resetScroll, swap, link, bindMenu, bindCardList, closeAllMenus, wireStandardFlow, wireTabs };

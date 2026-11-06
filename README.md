@@ -129,6 +129,7 @@ SPP/
 │   ├── frontend/                  # [VISTA] Código fuente de la interfaz de usuario en React
 │   │   ├── src/
 │   │   │   ├── components/        # Componentes React (Auth, Practice, Director, Reports, UI)
+│   │   │   ├── core/              # Módulos transversales (API client, Shell, Exportadores, UI)
 │   │   │   ├── entries/           # Puntos de montaje Vite (login, register, tutor, student, etc.)
 │   │   │   └── utils/             # Puentes y helpers de integración
 │   │   ├── package.json           # Dependencias de frontend (React, Vite, Lucide, FontAwesome)

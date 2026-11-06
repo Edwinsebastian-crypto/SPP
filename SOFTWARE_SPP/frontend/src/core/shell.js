@@ -1,16 +1,8 @@
 /* =========================================================================
    shell.js — Shared shell (sidebar, topbar, mobile menu, theme).
    Used by ALL logged-in panels (student, tutor, advisor, director).
-   Do not put anything panel-specific here; if a panel needs its own JS
-   (for example tutor.js), load it SEPARATELY, after this file.
    ========================================================================= */
 
-// --- Real visible height on mobile ---
-// On several Android browsers "dvh" is not recalculated correctly on load. --app-vh
-// fixes that with visualViewport. CAUTION: when the keyboard opens, visualViewport
-// shrinks; if we applied that height to .app-shell, the top bar would seem to
-// "disappear" until it scrolls out of the screen. That is why, with a focused field
-// and an open keyboard, we keep the layout height (without keyboard).
 let layoutViewportHeight = window.innerHeight;
 
 function isMobileLayout() {
@@ -48,9 +40,7 @@ function setAppViewportHeight() {
     document.documentElement.style.setProperty('--app-vh', (height * 0.01) + 'px');
 }
 
-/* exported scrollAppShellToReveal */
-/** Scrolls only .app-shell down to reveal an element (without scrollIntoView). */
-function scrollAppShellToReveal(element, margin = 16) {
+export function scrollAppShellToReveal(element, margin = 16) {
     const shell = document.querySelector('.app-shell');
     if (!shell || !element) return;
     const shellRect = shell.getBoundingClientRect();
@@ -100,7 +90,10 @@ document.addEventListener('focusout', (e) => {
     }, 120);
 });
 
-document.addEventListener('DOMContentLoaded', () => {
+function initShellDOM() {
+    if (document.body && document.body.dataset.sppShellInit === 'true') return;
+    if (document.body) document.body.dataset.sppShellInit = 'true';
+
     const sidebarToggle = document.getElementById('sidebarToggle');
     const mobileMenuToggles = document.querySelectorAll('.mobile-menu-toggle');
     const shell = document.querySelector('.app-shell');
@@ -134,7 +127,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const navLinks = document.querySelectorAll('.app-nav-link');
     const sections = document.querySelectorAll('.app-content');
 
-    // Activate item on page load if marked data-active or data-activo
     const preActive = document.querySelector('.app-nav-link[data-active], .app-nav-link[data-activo]');
     if (preActive) {
         navLinks.forEach((nav) => {
@@ -147,11 +139,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     navLinks.forEach((link) => {
         link.addEventListener('click', (e) => {
-            if (link.hasAttribute('data-externo') || link.hasAttribute('data-external')) return; // real link to another page: let the browser navigate
+            if (link.hasAttribute('data-externo') || link.hasAttribute('data-external')) return;
             e.preventDefault();
             const targetId = link.getAttribute('href').substring(1);
 
-            // Update links
             navLinks.forEach((nav) => {
                 nav.classList.remove('app-nav-link--active');
                 nav.removeAttribute('aria-current');
@@ -159,22 +150,16 @@ document.addEventListener('DOMContentLoaded', () => {
             link.classList.add('app-nav-link--active');
             link.setAttribute('aria-current', 'page');
 
-            // Show the matching section
             sections.forEach((section) => {
                 if (section.id === targetId) {
                     section.style.display = isMobileLayout() ? 'block' : 'flex';
                     const wrapper = section.querySelector('.practice-content-wrapper');
-                    if (wrapper) wrapper.style.display = ''; // restore visibility
+                    if (wrapper) wrapper.style.display = '';
                 } else {
                     section.style.display = 'none';
                 }
             });
 
-            // Scroll back to the top when switching sections. .app-shell is the only
-            // container that really scrolls (all sections live stacked inside it and
-            // only their display changes); if it is not reset here, the new section
-            // "inherits" the scroll of the previous one and may appear already
-            // scrolled to the bottom instead of starting at the top.
             window.scrollTo(0, 0);
             if (shell) shell.scrollTop = 0;
             document.querySelectorAll('.app-shell, .practice-content-wrapper, .reports-wrapper').forEach((el) => {
@@ -183,17 +168,12 @@ document.addEventListener('DOMContentLoaded', () => {
             updateAppTopbarOffset();
             requestAnimationFrame(updateAppTopbarOffset);
 
-            // On mobile, close the menu after choosing an option
             if (isMobileLayout() && shell.classList.contains('sidebar-open')) {
                 closeMobileMenu();
             }
         });
     });
 
-    // On load: the FIRST menu option (Home) is the landing screen, so it opens
-    // as soon as the user signs in. The section is resolved through the link's
-    // href (not the document order) because a panel may declare its sections in
-    // a different order than its menu. An explicit #hash still wins.
     navLinks.forEach((nav) => {
         nav.classList.remove('app-nav-link--active');
         nav.removeAttribute('aria-current');
@@ -219,12 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     updateAppTopbarOffset();
-    // --- Mobile menu ---
-    // .app-shell is the container that scrolls on mobile (see CSS).
-    // Instead of changing its "overflow" to block the background scroll
-    // (which makes the scrollbar appear/disappear and visibly reflows the
-    // content), the scroll gesture itself is blocked, letting the one that
-    // happens inside the menu pass freely.
+
     function blockBackgroundScroll(event) {
         if (sidebar && !sidebar.contains(event.target)) {
             event.preventDefault();
@@ -251,7 +226,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Toggle for desktop/tablet (collapse sidebar) or mobile (open drawer)
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', () => {
             if (!isMobileLayout()) {
@@ -262,12 +236,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Toggle for mobile (open the sidebar from the topbar)
     mobileMenuToggles.forEach((toggle) => {
         toggle.addEventListener('click', toggleMobileMenu);
     });
 
-    // Close the sidebar on mobile when clicking outside
     document.addEventListener('click', (event) => {
         if (!shell) return;
         if (isMobileLayout()) {
@@ -287,14 +259,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // If the window becomes desktop-sized with the mobile menu open, clean it up
     window.addEventListener('resize', () => {
         if (!isMobileLayout() && shell?.classList.contains('sidebar-open')) {
             closeMobileMenu();
         }
     });
 
-    // --- Floating tooltip for collapsed sidebar (estilo verde platino) ---
     if (sidebar && shell) {
         let tooltip = document.getElementById('sidebar-collapsed-tooltip');
         if (!tooltip) {
@@ -353,11 +323,14 @@ document.addEventListener('DOMContentLoaded', () => {
             sidebarToggle.addEventListener('click', hideTooltip);
         }
     }
+}
 
-});
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initShellDOM);
+} else {
+    initShellDOM();
+}
 
-// On mobile only .app-shell may scroll. If anything (scrollIntoView, focus, autofill...)
-// scrolls the window/body, put it back so the fixed top bar never covers the page title.
 window.addEventListener('scroll', () => {
     if (!isMobileLayout()) return;
     if (window.scrollY || document.documentElement.scrollTop || document.body.scrollTop) {
