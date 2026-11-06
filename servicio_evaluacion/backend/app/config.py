@@ -1,0 +1,68 @@
+"""Configuración del servicio (variables de entorno / archivo .env)."""
+from functools import lru_cache
+from pathlib import Path
+from typing import Literal
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=(ENV_PATH, ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
+    # Base de datos propia del servicio de evaluación (postgres_2)
+    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/spp_evaluacion"
+    auto_create_tables: bool = False
+
+    # CORS
+    cors_origins: str = "*"
+
+    # Autenticación
+    auth_mode: Literal["dev", "jwt"] = "jwt"
+    jwt_secret: str = ""
+    jwt_algorithm: str = "HS256"
+    notification_service_secret: str = ""
+
+    # IA
+    llm_provider: Literal["auto", "anthropic", "openai_compat", "mock"] = "openai_compat"
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-5-5"
+    llm_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    llm_api_key: str = ""
+    llm_model: str = "gemini-3.5-flash"
+    llm_max_tokens: int = 8000
+    max_context_chars: int = 60000
+    max_file_mb: int = 15
+
+    # Comunicación con el monolito para evidencias/actividades de prácticas
+    evidencias_mode: Literal["stub", "http"] = "http"
+    evidencias_api_url: str = "http://127.0.0.1:3000/api/internal"
+    evidencias_api_token: str = ""
+
+    @property
+    def cors_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def llm_effective(self) -> str:
+        """Proveedor que realmente se usará."""
+        if self.llm_provider == "auto":
+            if self.anthropic_api_key:
+                return "anthropic"
+            return "openai_compat" if (self.llm_base_url and self.llm_model) else "mock"
+        return self.llm_provider
+
+    @property
+    def llm_model_name(self) -> str:
+        """Nombre del modelo que se usará (para mostrar y registrar)."""
+        return {"anthropic": self.anthropic_model, "openai_compat": self.llm_model}.get(self.llm_effective, "simulado")
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

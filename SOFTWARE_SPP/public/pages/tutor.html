@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+	<title>SPP-Tutor</title>
+	<link rel="stylesheet" href="../css/variables.css">
+	<link rel="stylesheet" href="../css/shell.css">
+	<link rel="stylesheet" href="../css/home.css">
+	<link rel="stylesheet" href="../css/tutor.css">
+	<link rel="stylesheet" href="../css/evaluacion.css">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link
+		href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"
+		rel="stylesheet">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+	<main class="app-shell">
+		<aside class="app-sidebar">
+			<div>
+				<header class="app-brand">
+					<div>
+						<h1>SPP</h1>
+						<p>Pedagogical Practice<br>Software</p><span aria-hidden="true"></span>
+					</div>
+					<button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle menu">
+						<i class="fa-solid fa-bars hamburger-icon"></i>
+						<i class="fa-solid fa-graduation-cap overlay-cap"></i>
+					</button>
+				</header>
+				<nav class="app-navigation" aria-label="Main navigation">
+					<a class="app-nav-link" href="#home"><i class="fa-solid fa-house" aria-hidden="true"></i><span>Home</span></a>
+					<a class="app-nav-link" href="#practice"><i
+							class="fa-solid fa-book-open" aria-hidden="true"></i><span>Practices</span></a>
+					<a class="app-nav-link" href="#profile"><i class="fa-solid fa-user"
+							aria-hidden="true"></i><span>Profile</span></a>
+				</nav>
+			</div>
+			<a class="app-logout" href="../index.html"><i class="fa-solid fa-door-open" aria-hidden="true"></i><span>Log
+					out</span></a>
+		</aside>
+
+		<!-- HOME -->
+		<section class="app-content" id="home" style="display: none;">
+			<header class="app-topbar">
+				<button class="sidebar-toggle mobile-menu-toggle" id="mobileMenuToggleHome" aria-label="Open menu">
+					<i class="fa-solid fa-bars hamburger-icon"></i>
+					<i class="fa-solid fa-graduation-cap overlay-cap"></i>
+				</button>
+				<button class="topbar-icon" type="button" aria-label="Notifications"><i class="fa-regular fa-bell"
+						aria-hidden="true"></i></button>
+				<button class="topbar-option theme-toggle-btn" type="button" aria-label="Change theme"><i
+						class="fa-regular fa-sun" aria-hidden="true"></i><span>Light</span></button>
+				<button class="app-account" type="button" aria-label="Open tutor menu"><i
+						class="fa-solid fa-circle-user" aria-hidden="true"></i><span><strong>Tutor
+							Name</strong><small>Tutor</small></span></button>
+			</header>
+			<div class="practice-content-wrapper">
+				<div id="home-root" class="hm" aria-live="polite"></div>
+			</div>
+		</section>
+
+		<section class="app-content" id="practice">
+			<header class="app-topbar">
+				<button class="sidebar-toggle mobile-menu-toggle" id="mobileMenuToggle" aria-label="Open menu">
+					<i class="fa-solid fa-bars hamburger-icon"></i>
+					<i class="fa-solid fa-graduation-cap overlay-cap"></i>
+				</button>
+				<button class="topbar-icon" type="button" aria-label="Notifications"><i class="fa-regular fa-bell"
+						aria-hidden="true"></i></button>
+				<button class="topbar-option theme-toggle-btn" type="button" aria-label="Change theme"><i
+						class="fa-regular fa-sun" aria-hidden="true"></i><span>Light</span></button>
+				<button class="app-account" type="button" aria-label="Open tutor menu"><i
+						class="fa-solid fa-circle-user" aria-hidden="true"></i><span><strong>Tutor
+							Name</strong><small>Tutor</small></span></button>
+			</header>
+
+			<div class="practice-content-wrapper">
+				<section class="practice-panel is-loading" aria-labelledby="practice-title">
+					<div class="practice-header">
+						<h2 id="practice-title">Practice Information</h2>
+						<div class="practice-status">
+							<span>Status</span>
+							<div class="status-badge"></div>
+						</div>
+					</div>
+					<form class="practice-form" action="#" method="post">
+						<div class="practice-field"><label for="practice-name">Practice Name</label>
+							<div class="practice-value" id="practice-name">.....</div>
+						</div>
+						<div class="practice-field"><label for="tutor">Tutor</label>
+							<div class="practice-value" id="tutor">.....</div>
+						</div>
+						<div class="practice-field"><label for="hours">Practice Hours</label>
+							<div class="practice-value" id="hours">.....</div>
+						</div>
+						<div class="practice-field"><label for="institution">Institution</label>
+							<div class="practice-value" id="institution">.....</div>
+						</div>
+						<div class="practice-field"><label for="advisor">Advisor</label>
+							<div class="practice-value" id="advisor">.....</div>
+						</div>
+						<div class="practice-field"><label for="semester">Semester</label>
+							<div class="practice-value" id="semester">.....</div>
+						</div>
+						<div class="practice-field practice-field--date"><label for="start-date">Start Date</label>
+							<div>
+								<div class="practice-value" id="start-date">.....</div><i class="fa-regular fa-calendar"
+									aria-hidden="true"></i>
+							</div>
+						</div>
+						<div class="practice-field practice-field--date"><label for="end-date">End Date</label>
+							<div>
+								<div class="practice-value" id="end-date">.....</div><i class="fa-regular fa-calendar"
+									aria-hidden="true"></i>
+							</div>
+						</div>
+						<div class="practice-field"><label for="code">Practice Code</label>
+							<div class="practice-value" id="code">.....</div>
+						</div>
+					</form>
+					<button class="practice-submit" type="button" aria-label="Enter">
+						<span class="practice-submit-text">Enter</span>
+						<span class="practice-submit-glow" aria-hidden="true">
+							<svg class="practice-submit-streaks" viewBox="0 0 120 44" preserveAspectRatio="none">
+								<defs>
+									<linearGradient id="psStreakGrad" x1="100%" y1="0%" x2="0%" y2="0%">
+										<stop offset="0%" stop-color="var(--ps-streak-color-1, #34d399)" stop-opacity="0.95" />
+										<stop offset="20%" stop-color="var(--ps-streak-color-1, #34d399)" stop-opacity="0.8" />
+										<stop offset="55%" stop-color="var(--ps-streak-color-2, #10b981)" stop-opacity="0.3" />
+										<stop offset="100%" stop-color="var(--ps-streak-color-2, #10b981)" stop-opacity="0" />
+									</linearGradient>
+									<filter id="psGlowBlur" x="-30%" y="-30%" width="160%" height="160%">
+										<feGaussianBlur stdDeviation="1" result="blur" />
+										<feMerge>
+											<feMergeNode in="blur" />
+											<feMergeNode in="SourceGraphic" />
+										</feMerge>
+									</filter>
+								</defs>
+								<rect x="50" y="7" width="70" height="3" rx="1.5" fill="url(#psStreakGrad)" filter="url(#psGlowBlur)" />
+								<rect x="25" y="14" width="95" height="3.5" rx="1.75" fill="url(#psStreakGrad)" filter="url(#psGlowBlur)" />
+								<rect x="5" y="21" width="115" height="4" rx="2" fill="url(#psStreakGrad)" filter="url(#psGlowBlur)" />
+								<rect x="22" y="28.5" width="98" height="3.5" rx="1.75" fill="url(#psStreakGrad)" filter="url(#psGlowBlur)" />
+								<rect x="55" y="35" width="65" height="3" rx="1.5" fill="url(#psStreakGrad)" filter="url(#psGlowBlur)" />
+							</svg>
+						</span>
+						<span class="practice-submit-circle">
+							<svg viewBox="0 0 24 24" class="practice-submit-arrow" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+								<line x1="5" y1="12" x2="19" y2="12"></line>
+								<polyline points="12 5 19 12 12 19"></polyline>
+							</svg>
+						</span>
+					</button>
+				</section>
+
+				<!-- LOGBOOK PANEL (shown after Enter) -->
+				<section class="logbook-panel" id="logbook-panel" aria-labelledby="logbook-title"
+					style="display: none;">
+					<div class="logbook-header">
+						<button type="button" class="logbook-back-btn" id="logbookBack"
+							aria-label="Back to Practice Information">
+							<i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+						</button>
+						<h2 id="logbook-title" class="logbook-title">Practice <span class="lb-student-name"
+								aria-label="View student credentials"></span></h2>
+					</div>
+					<!-- BANNER DE CALIFICACIÓN Y OBSERVACIÓN -->
+					<div class="lb-hero-banner is-loading" id="lb-hero-banner" style="cursor: pointer;" title="Haz clic para editar la calificación y observación">
+						<div class="lb-hero-left">
+							<div class="lb-score-ring" id="lb-score-ring">
+								<svg class="lb-ring-svg" viewBox="0 0 88 88" aria-hidden="true">
+									<circle class="lb-ring-bg" cx="44" cy="44" r="36" />
+									<circle class="lb-ring-fill" id="lb-ring-fill" cx="44" cy="44" r="36" />
+								</svg>
+								<div class="lb-ring-content">
+									<span class="lb-score-val" id="lb-score-val">—</span>
+									<span class="lb-score-max">OF 5.0</span>
+								</div>
+							</div>
+							<div class="lb-grade-info">
+								<span class="lb-grade-kicker">FINAL GRADE</span>
+								<h3 class="lb-grade-title" id="lb-grade-title">—</h3>
+							</div>
+						</div>
+
+						<div class="lb-hero-right">
+							<div class="lb-obs-box">
+								<div style="display: flex; justify-content: space-between; align-items: center;">
+									<span class="lb-obs-kicker">GENERAL OBSERVATION</span>
+									<i class="fa-solid fa-pen-to-square" style="color: #8ec3ab; font-size: 13px;" title="Edit logbook"></i>
+								</div>
+								<div class="lb-obs-text-wrap">
+									<span class="lb-obs-quote" aria-hidden="true">”</span>
+									<p class="lb-obs-text" id="lb-obs-text">—</p>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Formulario de edición de calificación y observación para el tutor -->
+					<div id="tutor-logbook-edit-form" style="display: none; background: #ffffff; border-radius: 16px; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 4px 18px rgba(0,0,0,0.06); border: 1px solid rgba(0,0,0,0.06);">
+						<h4 style="margin: 0 0 16px 0; font-family: var(--font-sans); color: #103323; font-size: 16px;">Edit Grade and Observation</h4>
+						<div style="display: grid; grid-template-columns: 140px 1fr; gap: 16px; margin-bottom: 16px;">
+							<div>
+								<label for="grade-input" style="display: block; font-size: 13px; font-weight: 600; color: #53685e; margin-bottom: 6px;">Grade (0 - 5)</label>
+								<input type="number" id="grade-input" step="0.1" min="0" max="5" placeholder="5.0" style="width: 100%; height: 40px; padding: 0 12px; border: 1px solid rgba(0,0,0,0.15); border-radius: 8px; font-size: 15px; box-sizing: border-box;">
+							</div>
+							<div>
+								<label for="obs-input" style="display: block; font-size: 13px; font-weight: 600; color: #53685e; margin-bottom: 6px;">General Observation</label>
+								<input type="text" id="obs-input" placeholder="Write an observation for the student..." style="width: 100%; height: 40px; padding: 0 12px; border: 1px solid rgba(0,0,0,0.15); border-radius: 8px; font-size: 15px; box-sizing: border-box;">
+							</div>
+						</div>
+						<div class="am-actions" id="edit-actions" style="display: flex; justify-content: flex-end; gap: 12px; margin: 0;">
+							<button type="button" class="am-btn-cancel" id="cancel-edit-btn">Cancel</button>
+							<button type="button" class="am-btn-confirm" id="save-edit-btn">Save</button>
+						</div>
+					</div>
+
+					<!-- ACCIONES (TARJETAS DE ACTIVIDADES Y PREGUNTAS) -->
+					<div class="lb-cards-grid">
+						<!-- Tarjeta 1: Actividades -->
+						<div class="lb-card" id="lb-card-activities" role="button" tabindex="0">
+							<div class="lb-card-top">
+								<div class="lb-card-icon" aria-hidden="true">
+									<i class="fa-regular fa-clipboard"></i>
+								</div>
+								<span class="lb-card-pill is-skel-pill" id="lb-hours-pill">0 / 0 h</span>
+							</div>
+							<div class="lb-card-body">
+								<h3 class="lb-card-title">Activities</h3>
+								<p class="lb-card-desc">Review assigned tasks and their delivery status.</p>
+							</div>
+							<div class="lb-card-bottom">
+								<span class="lb-card-pill is-skel-pill" id="lb-pending-pill">Up to date</span>
+								<button type="button" class="lb-action-btn" id="preguntas-actividades-btn" aria-label="Enter Activities">
+									<i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+								</button>
+							</div>
+						</div>
+
+						<!-- Tarjeta 2: Sección de preguntas -->
+						<div class="lb-card" id="lb-card-questions" role="button" tabindex="0">
+							<div class="lb-card-top">
+								<div class="lb-card-icon" aria-hidden="true">
+									<i class="fa-regular fa-circle-question"></i>
+								</div>
+							</div>
+							<div class="lb-card-body">
+								<h3 class="lb-card-title">Questions Section</h3>
+								<p class="lb-card-desc">Review the questionnaire and your answers.</p>
+							</div>
+							<div class="lb-card-bottom">
+								<span class="lb-card-pill is-skel-pill" id="lb-questions-pill">Up to date</span>
+								<button type="button" class="lb-action-btn" id="preguntas-preguntas-btn" aria-label="Enter Questions Section">
+									<i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+								</button>
+							</div>
+						</div>
+					</div>
+				</section>
+
+				<!-- ACTIVITIES PANEL (shown after Enter) -->
+				<section class="activities-panel" id="activities-panel" aria-labelledby="activities-title"
+					style="display: none;">
+					<div class="activities-header">
+						<button type="button" class="activities-back-btn" id="activitiesBack"
+							aria-label="Volver a Información de la Práctica">
+							<i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+						</button>
+						<h2 id="activities-title" class="activities-title">Activities</h2>
+						<button type="button" class="am-open-btn" id="amOpenBtn">
+							<i class="fa-solid fa-circle-plus" aria-hidden="true"></i>
+							<span>Assign Activity</span>
+						</button>
+					</div>
+
+					<!-- Summary KPI Stats Cards -->
+					<div class="act-kpis" id="act-kpis">
+						<div class="act-kpi-card" id="act-kpi-card-pending" role="button" tabindex="0" title="Filter pending tasks">
+							<div class="act-kpi-icon act-kpi-icon--pending">
+								<i class="fa-regular fa-calendar-days" aria-hidden="true"></i>
+							</div>
+							<div class="act-kpi-content">
+								<span class="act-kpi-label">Pending Tasks:</span>
+								<strong class="act-kpi-val" id="act-kpi-pending">0</strong>
+							</div>
+						</div>
+						<div class="act-kpi-card" id="act-kpi-card-review" role="button" tabindex="0" title="Filter activities pending review">
+							<div class="act-kpi-icon act-kpi-icon--review">
+								<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+							</div>
+							<div class="act-kpi-content">
+								<span class="act-kpi-label">Pending Review:</span>
+								<strong class="act-kpi-val" id="act-kpi-review">0</strong>
+							</div>
+						</div>
+						<div class="act-kpi-card" id="act-kpi-card-completed" role="button" tabindex="0" title="Filter completed activities">
+							<div class="act-kpi-icon act-kpi-icon--completed">
+								<i class="fa-solid fa-check" aria-hidden="true"></i>
+							</div>
+							<div class="act-kpi-content">
+								<span class="act-kpi-label">Completed:</span>
+								<strong class="act-kpi-val" id="act-kpi-completed">0</strong>
+							</div>
+						</div>
+						<div class="act-kpi-card" id="act-kpi-card-grade" role="button" tabindex="0" title="Filter graded activities">
+							<div class="act-kpi-icon act-kpi-icon--grade">
+								<i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+							</div>
+							<div class="act-kpi-content">
+								<span class="act-kpi-label">Average Grade:</span>
+								<strong class="act-kpi-val" id="act-kpi-grade">0.0/5.0</strong>
+							</div>
+						</div>
+					</div>
+
+					<!-- Search & Filter Controls -->
+					<div class="act-controls">
+						<div class="act-search-box">
+							<input type="text" id="act-search-input" class="act-search-input" placeholder="Search" aria-label="Search activities" autocomplete="off" />
+							<i class="fa-solid fa-magnifying-glass act-search-icon" aria-hidden="true"></i>
+						</div>
+						<div class="act-filter-pills" role="tablist" aria-label="Activity Filters">
+							<button type="button" class="act-pill-btn is-active" data-filter="all">All</button>
+							<button type="button" class="act-pill-btn" data-filter="pending">To Do / Pending</button>
+							<button type="button" class="act-pill-btn" data-filter="review"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> Pending Review</button>
+							<button type="button" class="act-pill-btn" data-filter="completed">Completed</button>
+							<button type="button" class="act-pill-btn" data-filter="graded">Graded</button>
+						</div>
+					</div>
+
+					<!-- Grid of Activity Cards -->
+					<div id="activities-list-container" class="act-grid"></div>
+				</section>
+
+				<!-- QUESTIONS & EVALUATIONS PANEL (shown after Enter) -->
+				<section class="questions-panel" id="questions-panel" aria-labelledby="questions-title"
+					style="display: none;">
+					<div class="questions-header">
+						<button type="button" class="questions-back-btn" id="questionsBack"
+							aria-label="Back to Logbook Information">
+							<i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+						</button>
+						<h2 id="questions-title" class="questions-title">Questions & Evaluations</h2>
+					</div>
+
+					<div class="ev-wrapper" style="padding: 10px 0;">
+						<div id="ev-banner"></div>
+
+						<!-- ===== EVALUATIONS LIST ===== -->
+						<section class="ev-view" id="view-lista" aria-labelledby="lista-title">
+							<div class="ev-panel">
+								<div class="ev-head">
+									<div style="margin-right:auto;min-width:0">
+										<h3 id="lista-title" style="margin:0; font-family: var(--font-serif); font-size: 22px;">Practice Evaluations</h3>
+										<p class="ev-sub" id="lista-contexto"></p>
+									</div>
+									<button type="button" class="ev-btn ev-btn--primary" id="btn-nueva"><i class="fa-solid fa-plus"></i>New evaluation</button>
+								</div>
+								<div class="ev-stack" id="lista-contenido"><p class="ev-loading">Loading…</p></div>
+							</div>
+						</section>
+
+						<!-- ===== EVALUATION EDITOR ===== -->
+						<section class="ev-view" id="view-editor" aria-labelledby="editor-title" hidden>
+							<div class="ev-panel">
+								<div class="ev-head">
+									<button type="button" class="ev-back" id="btn-volver-lista" aria-label="Back to list"><i class="fa-solid fa-arrow-left"></i></button>
+									<div style="margin-right:auto;min-width:0">
+										<h3 id="editor-title" style="margin:0; font-family: var(--font-serif); font-size: 22px;"></h3>
+										<div class="ev-badges" id="editor-badges" style="margin-top:8px"></div>
+									</div>
+									<div class="ev-toolbar" id="editor-acciones"></div>
+								</div>
+								<div class="ev-stats" id="editor-stats"></div>
+								<div class="ev-toolbar" id="editor-agregar"></div>
+
+								<div class="ev-tabs" role="tablist">
+									<button type="button" class="ev-tab" role="tab" id="tab-preguntas" aria-selected="true">Questions</button>
+									<button type="button" class="ev-tab" role="tab" id="tab-resultados" aria-selected="false">Results</button>
+								</div>
+								<div id="tabpanel-preguntas"></div>
+								<div id="tabpanel-resultados" hidden></div>
+							</div>
+						</section>
+
+						<!-- ===== ATTEMPT DETAILS ===== -->
+						<section class="ev-view" id="view-intento" aria-labelledby="intento-title" hidden>
+							<div class="ev-panel">
+								<div class="ev-head">
+									<button type="button" class="ev-back" id="btn-volver-editor" aria-label="Back to evaluation"><i class="fa-solid fa-arrow-left"></i></button>
+									<div style="margin-right:auto;min-width:0">
+										<h3 id="intento-title" style="margin:0; font-family: var(--font-serif); font-size: 22px;"></h3>
+										<div class="ev-badges" id="intento-badges" style="margin-top:8px"></div>
+									</div>
+								</div>
+								<div class="ev-stack" id="intento-contenido"></div>
+							</div>
+						</section>
+					</div>
+				</section>
+
+				<!-- EVIDENCE PANEL (shown after entering an Activity) -->
+				<section class="evidences-panel" id="evidences-panel" aria-labelledby="evidences-title"
+					style="display: none;">
+					<div class="evidences-header">
+						<button type="button" class="evidences-back-btn" id="evidencesBack"
+							aria-label="Volver a Activityes">
+							<i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+						</button>
+						<h2 id="evidences-title" class="evidences-title">Activity</h2>
+
+						<!-- Menú de la actividad -->
+						<div class="ev-menu-wrapper" id="act-main-menu" style="margin-left: auto;">
+							<button type="button" class="ev-menu-btn" aria-label="Opciones de actividad"
+								aria-expanded="false">
+								<i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+							</button>
+							<div class="ev-dropdown" role="menu">
+								<button type="button" class="ev-dropdown-item ev-item--edit act-edit-btn"
+									role="menuitem">
+									<i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> Edit
+								</button>
+								<button type="button" class="ev-dropdown-item ev-item--delete" role="menuitem">
+									<i class="fa-solid fa-trash" aria-hidden="true"></i> Delete
+								</button>
+							</div>
+						</div>
+					</div>
+
+					<!-- Activity Details Card -->
+					<div class="act-details-card">
+						<div class="act-details-left" id="act-left-panel">
+							<div class="act-details-header-row">
+								<h3 class="act-details-title">Activity Information</h3>
+							</div>
+							<div class="act-field">
+								<span class="act-label">Activity Name</span>
+								<div class="act-value-box" id="act-name-display">-</div>
+							</div>
+							<div class="act-row" id="act-grid-row">
+								<div class="act-field act-field--date">
+									<span class="act-label" id="lbl-assigned-date">Assignment Date</span>
+									<div class="act-value-box"><span id="act-start-display">-</span><i
+											class="fa-regular fa-calendar" id="act-calendar-icon" aria-hidden="true"
+											style="display: none;"></i></div>
+								</div>
+								<div class="act-field act-field--date" id="act-deadline-container">
+									<span class="act-label">Deadline</span>
+									<div class="act-value-box" id="act-end-display">without limit</div>
+								</div>
+								<div class="act-field" id="act-nota-container"
+									style="cursor: pointer; -webkit-tap-highlight-color: transparent;">
+									<span class="act-label" id="lbl-grade">Grade:</span>
+									<div class="act-value-box" id="act-grade-display">0</div>
+									<input type="number" id="act-grade-input" class="act-value-box act-input" min="0"
+										max="5" step="0.1" placeholder="0.0" value="0" style="display: none;">
+								</div>
+								<div class="act-field">
+									<span class="act-label" id="lbl-hours">Hours Completed</span>
+									<div class="act-value-box" id="act-hours-display">0</div>
+								</div>
+							</div>
+							<div class="am-actions" id="act-nota-actions"
+								style="display: none; justify-content: flex-end; margin-top: 5px; margin-bottom: 15px; gap: 10px;">
+								<button type="button" class="am-btn-cancel" id="act-nota-cancel-btn">Cancel</button>
+								<button type="button" class="am-btn-confirm" id="act-nota-save-btn">Save</button>
+							</div>
+							<div class="act-field" id="act-desc-container">
+								<span class="act-label">Description</span>
+								<div class="act-desc-box" id="act-desc-display">-</div>
+							</div>
+						</div>
+						<div class="act-details-right" id="act-right-panel">
+							<div class="am-file-list" id="act-files-display"></div>
+						</div>
+					</div>
+
+					<h3 class="feedback-title" style="margin: 10px 0 20px 0;">Activity Evidence</h3>
+
+					<!-- SECCIÓN DE RETROALIMENTACIONES -->
+					<div class="feedback-section">
+						<h3 class="feedback-title">Feedback</h3>
+
+
+						<!-- Evidence Template (Hidden) -->
+						<div class="ev-card" style="display: none;">
+							<div class="ev-card-body">
+								<p class="ev-card-title"></p>
+								<p class="ev-card-desc"></p>
+							</div>
+							<div class="ev-menu-wrapper">
+								<button type="button" class="ev-menu-btn" aria-label="Evidence options"
+									aria-expanded="false">
+									<i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+								</button>
+								<div class="ev-dropdown" role="menu">
+									<button type="button" class="ev-dropdown-item ev-item--view" role="menuitem">
+										<i class="fa-solid fa-eye" aria-hidden="true"></i> View
+									</button>
+								</div>
+							</div>
+						</div>
+
+						<!-- Feedback Template (Hidden) -->
+						<div class="feedback-card" style="display: none;">
+							<div class="feedback-card-body">
+								<div class="feedback-header">
+									<span class="feedback-role"></span>
+									<span class="feedback-date"></span>
+								</div>
+								<p class="feedback-content"></p>
+							</div>
+							<div class="ev-menu-wrapper">
+								<button type="button" class="ev-menu-btn" aria-label="Feedback options"
+									aria-expanded="false">
+									<i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+								</button>
+								<div class="ev-dropdown" role="menu">
+									<button type="button" class="ev-dropdown-item ev-item--view" role="menuitem">
+										<i class="fa-solid fa-eye" aria-hidden="true"></i> View
+									</button>
+									<button type="button" class="ev-dropdown-item ev-item--edit" role="menuitem">
+										<i class="fa-solid fa-pen" aria-hidden="true"></i> Edit
+									</button>
+									<button type="button" class="ev-dropdown-item ev-item--delete" role="menuitem">
+										<i class="fa-solid fa-trash" aria-hidden="true"></i> Delete
+									</button>
+								</div>
+							</div>
+						</div>
+
+						<div class="feedback-form-section">
+							<h4 class="feedback-form-title">Add Comment:</h4>
+							<div class="feedback-input-wrapper">
+								<textarea class="feedback-textarea" placeholder="Enter the text..."></textarea>
+								<button type="button" class="feedback-btn-submit"
+									aria-label="Enviar Retroalimentación"><i
+										class="fa-solid fa-paper-plane"></i></button>
+							</div>
+							<div class="feedback-actions">
+								<button type="button" class="feedback-btn-cancel"><i class="fa-solid fa-trash-can"></i>
+									Cancel</button>
+							</div>
+						</div>
+					</div>
+				</section>
+
+			</div>
+		</section>
+
+
+		<!-- TAB - PROFILE-->
+		<section class="app-content" id="profile" style="display: none;">
+			<header class="app-topbar">
+				<button class="sidebar-toggle mobile-menu-toggle" id="mobileMenuToggleProfile" aria-label="Open menu">
+					<i class="fa-solid fa-bars hamburger-icon"></i>
+					<i class="fa-solid fa-graduation-cap overlay-cap"></i>
+				</button>
+				<button class="topbar-icon" type="button" aria-label="Notifications"><i class="fa-regular fa-bell"
+						aria-hidden="true"></i></button>
+				<button class="topbar-option theme-toggle-btn" type="button" aria-label="Change theme"><i
+						class="fa-regular fa-sun" aria-hidden="true"></i><span>Light</span></button>
+				<button class="app-account" type="button" aria-label="Open student menu"><i
+						class="fa-solid fa-circle-user" aria-hidden="true"></i><span><strong>Tutor
+							Name</strong><small>Tutor</small></span></button>
+			</header>
+
+			<div class="practice-content-wrapper">
+				<h2 class="profile-title" id="profile-title">Profile</h2>
+				<section class="profile-panel" aria-labelledby="profile-title">
+					<div class="profile-layout">
+						<div class="profile-column">
+							<div class="profile-info-list">
+								<div class="profile-info-item">
+									<div class="profile-info-icon"><i class="fa-solid fa-id-badge"></i></div>
+									<div class="profile-info-text">
+										<span class="profile-info-label">Full Name:</span>
+										<span class="profile-info-value">Full Name</span>
+									</div>
+								</div>
+								<div class="profile-info-item">
+									<div class="profile-info-icon"><i class="fa-solid fa-address-card"></i></div>
+									<div class="profile-info-text">
+										<span class="profile-info-label">ID:</span>
+										<span class="profile-info-value">Document - ID</span>
+									</div>
+								</div>
+								<div class="profile-info-item">
+									<div class="profile-info-icon"><i class="fa-solid fa-envelope"></i></div>
+									<div class="profile-info-text">
+										<span class="profile-info-label">Email:</span>
+										<span class="profile-info-value">Email</span>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="profile-column">
+							<div class="profile-info-list">
+								<div class="profile-info-item">
+									<div class="profile-info-icon"><i class="fa-solid fa-building-columns"></i></div>
+									<div class="profile-info-text">
+										<span class="profile-info-label">Program:</span>
+										<span class="profile-info-value">Early Childhood Education Degree</span>
+									</div>
+								</div>
+								<div class="profile-info-item">
+									<div class="profile-info-icon"><i class="fa-solid fa-school"></i></div>
+									<div class="profile-info-text">
+										<span class="profile-info-label">Faculty:</span>
+										<span class="profile-info-value">Faculty of Education and Humanities</span>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</section>
+			</div>
+		</section>
+		<!-- Modal: Assign New Activity -->
+		<div id="am-modal" class="am-modal-overlay" style="display: none;">
+			<div class="am-modal" role="dialog" aria-modal="true" aria-labelledby="am-modal-title">
+				<button type="button" class="am-modal-close" id="amModalCloseX" aria-label="Close">
+					<i class="fa-solid fa-xmark" aria-hidden="true"></i>
+				</button>
+				<h3 class="am-modal-title" id="am-modal-title">Assign New Activity</h3>
+
+				<form id="am-form" class="am-form" novalidate>
+					<div class="am-field">
+						<label for="am-nombre">Name</label>
+						<input type="text" id="am-nombre" name="nombre" placeholder="Enter activity name"
+							autocomplete="off" required>
+					</div>
+
+					<div class="am-field">
+						<label for="am-desc">Description (optional)</label>
+						<textarea id="am-desc" name="descripcion" rows="3"
+							placeholder="Enter activity description"></textarea>
+					</div>
+
+					<div class="am-field-row">
+						<div class="am-field">
+							<label for="am-fecha-asig">Assignment Date</label>
+							<div class="am-date-wrap">
+								<input type="datetime-local" id="am-fecha-asig" name="fecha-asignacion" required>
+								<i class="fa-regular fa-calendar right-icon"></i>
+							</div>
+						</div>
+						<div class="am-field">
+							<label for="am-fecha-limite">Deadline (optional)</label>
+							<div class="am-date-wrap">
+								<input type="datetime-local" id="am-fecha-limite" name="fecha-limite">
+								<i class="fa-regular fa-calendar right-icon"></i>
+							</div>
+						</div>
+					</div>
+
+					<div class="am-dropzone" id="am-dropzone" tabindex="0" role="button"
+						aria-label="Adjuntar archivos de la actividad">
+						<input type="file" id="am-file-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx" multiple hidden>
+						<i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i>
+						<strong>Attach Activity Files</strong>
+						<span>Drag files here or click to upload</span>
+						<div class="am-file-list" id="am-file-list"></div>
+					</div>
+
+					<div class="am-actions">
+						<button type="button" class="am-btn-cancel" id="amBtnCancel"> <i
+								class="fa-solid fa-trash-can"></i>Cancel</button>
+						<button type="submit" class="am-btn-confirm">Confirm Assignment</button>
+					</div>
+				</form>
+			</div>
+		</div>
+		<!-- Modal: Confirm Deletion -->
+		<div id="delete-confirm-modal" class="am-modal-overlay" style="display: none;">
+			<div class="am-modal" role="dialog" aria-modal="true" aria-labelledby="delete-confirm-title" style="max-width: 450px;">
+				<button type="button" class="am-modal-close" id="deleteConfirmCloseX" aria-label="Close">
+					<i class="fa-solid fa-xmark" aria-hidden="true"></i>
+				</button>
+				<h3 class="am-modal-title" id="delete-confirm-title" style="margin-bottom: 20px;">Confirm Deletion</h3>
+
+				<div class="am-modal-text" style="font-size: 1rem; margin-bottom: 30px; line-height: 1.5; font-family: 'Inter', sans-serif;">
+					Are you sure you want to delete this activity?<br><br>
+					The activity <strong id="delete-confirm-name"></strong> and its description will be permanently deleted.<br><br>
+					This action cannot be undone.
+				</div>
+
+				<div class="am-actions" style="justify-content: flex-start; gap: 16px;">
+					<button type="button" class="am-btn-cancel" id="deleteConfirmCancel" style="margin: 0;">Cancel</button>
+					<button type="button" class="am-btn-confirm" id="deleteConfirmYes" style="margin: 0; background-color: #901010; color: white;">Delete Activity</button>
+				</div>
+			</div>
+		</div>
+
+	</main>
+	<!-- Modal: Success Modal -->
+	<div id="success-modal" class="am-modal-overlay" style="display: none; align-items: center; justify-content: center; z-index: 10000; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4);">
+		<div class="am-modal" role="dialog" aria-modal="true" style="max-width: 450px; width: 90%; text-align: center; padding: 40px 30px; border-radius: 20px; position: relative;">
+			<button type="button" class="am-modal-close" id="successModalCloseX" aria-label="Close" style="position: absolute; top: 15px; right: 15px; border: none; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+				<i class="fa-solid fa-xmark" aria-hidden="true"></i>
+			</button>
+			
+			<h3 id="success-modal-title" class="am-modal-title" style="margin-top: 0; margin-bottom: 20px; font-family: 'Playfair Display', serif; font-size: 1.8rem; font-weight: 700;">Assignment Submitted</h3>
+			
+			<div style="margin-bottom: 20px;">
+				<i class="fa-solid fa-check" style="font-size: 3rem; color: #6e8b7c;"></i>
+			</div>
+
+			<div id="success-modal-message" class="am-modal-text" style="font-size: 1.1rem; margin-bottom: 30px; line-height: 1.4; font-family: 'Inter', sans-serif;">
+				Your task has been successfully uploaded.
+			</div>
+
+			<div style="display: flex; justify-content: center;">
+				<button type="button" id="successModalAcceptBtn" style="background-color: #901010; color: white; border: none; border-radius: 8px; padding: 12px 30px; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 1rem; cursor: pointer; min-width: 150px; transition: background-color 0.2s;">Accept</button>
+			</div>
+		</div>
+	</div>
+
+	<!-- Modal: student credential (practice) -->
+	<div id="lb-modal-credential" class="modal-overlay" style="display: none;">
+		<div class="um-modal-card">
+			<div id="lb-modal-credential-body"></div>
+		</div>
+	</div>
+	<script src="../js/core/api.js"></script>
+	<script src="../js/core/shell.js"></script>
+	<script src="../js/core/panels.js"></script>
+	<script src="../js/core/custom-select.js"></script>
+	<script src="../js/core/ui.js"></script>
+	<script type="module" src="../dist/evaluacion-tutor.js"></script>
+</body>
+
+</html>

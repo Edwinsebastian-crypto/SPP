@@ -1,0 +1,43 @@
+# Levanta PostgreSQL (con el esquema limpio) + el backend.
+#   docker compose up --build
+# API: http://localhost:8000/docs
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: spp_evaluacion
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # se ejecutan SOLO la primera vez que se crea el volumen
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d spp_evaluacion"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    depends_on:
+      db: { condition: service_healthy }
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://postgres:postgres@db:5432/spp_evaluacion}
+      CORS_ORIGINS: "${CORS_ORIGINS:-*}"
+      AUTH_MODE: "${AUTH_MODE:-jwt}"
+      JWT_SECRET: "${JWT_SECRET:-}"
+      EVIDENCIAS_MODE: "${EVIDENCIAS_MODE:-http}"
+      EVIDENCIAS_API_URL: "${EVIDENCIAS_API_URL:-http://host.docker.internal:3000/api/internal}"
+      EVIDENCIAS_API_TOKEN: "${EVIDENCIAS_API_TOKEN:-}"
+      LLM_PROVIDER: "${LLM_PROVIDER:-openai_compat}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}"
+      LLM_API_KEY: "${LLM_API_KEY:-}"
+      LLM_MODEL: "${LLM_MODEL:-gemini-3.8-flash}"
+    ports: ["8000:8000"]
+
+volumes:
+  pgdata:

@@ -1,0 +1,1 @@
+import{m as i,a as o}from"./chunks/panel-common-mount-DfbDyVOZ.js";import"./chunks/client-BvckCBpw.js";function t(){i("advisor"),o("advisor")}document.readyState==="loading"?document.addEventListener("DOMContentLoaded",t):t();

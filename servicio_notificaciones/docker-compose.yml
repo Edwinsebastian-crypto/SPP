@@ -1,0 +1,96 @@
+# SPP · Servicio de notificaciones
+#
+#   cp .env.example .env     (define NOTIFICATION_SERVICE_SECRET y DATABASE_URL_PRACTICE)
+#   docker compose up --build -d
+#
+#   API del servicio ........ http://localhost:4000/health   (solo accesible desde esta máquina)
+#   Correos de prueba (UI) .. http://localhost:8025          (Mailpit: aquí ves los correos que "envía" el servicio)
+#   MongoDB ................. mongodb://localhost:27017      (Compass: usuario/clave de MONGO_USER / MONGO_PASSWORD)
+#
+# Todas las variables se leen del archivo .env que está junto a este compose; las que no definas usan el valor por defecto
+# de aquí (pensado para desarrollo). Para enviar correos REALES define SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS /
+# MAIL_FROM en .env y quita (o ignora) el servicio `mailpit`.
+name: spp-notificaciones
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-spp}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-spp_dev_password}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-spp_notificaciones}
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\" | grep -q 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # Servidor SMTP de pruebas: recibe los correos y los muestra en http://localhost:8025 (no sale nada a Internet).
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"   # interfaz web
+      - "127.0.0.1:1025:1025"   # SMTP
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+
+  notificaciones:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    ports:
+      # solo localhost: este servicio confía en el token del monolito y NO debe exponerse a Internet
+      - "127.0.0.1:${PORT:-4000}:${PORT:-4000}"
+    environment:
+      PORT: ${PORT:-4000}
+      TZ: ${TZ:-America/Bogota}
+      NODE_ENV: production
+
+      # MongoDB de este microservicio (colección `notificaciones`). El servicio arma la URI con estas variables;
+      # si defines MONGO_URI_NOTIFICATIONS en .env (p. ej. Atlas) esa tiene prioridad.
+      MONGO_HOST: mongo
+      MONGO_USER: ${MONGO_USER:-spp}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:-spp_dev_password}
+      MONGO_DB: ${MONGO_DB:-spp_notificaciones}
+      MONGO_URI_NOTIFICATIONS: ${MONGO_URI_NOTIFICATIONS:-}
+
+      # Bases del monolito y del servicio de evaluación: SOLO LECTURA (el servicio fuerza default_transaction_read_only).
+      DATABASE_URL_PRACTICE: ${DATABASE_URL_PRACTICE:?Define DATABASE_URL_PRACTICE en .env (la misma base de prácticas del monolito)}
+      DATABASE_URL_EVALUATION: ${DATABASE_URL_EVALUATION:-}
+      DB_SSL: ${DB_SSL:-true}
+
+      # Secreto compartido con el monolito (su NOTIFICATION_SERVICE_SECRET)
+      NOTIFICATION_SERVICE_SECRET: ${NOTIFICATION_SERVICE_SECRET:?Define NOTIFICATION_SERVICE_SECRET en .env (mínimo 16 caracteres, igual al del monolito)}
+
+      # Correo
+      MAIL_MODE: ${MAIL_MODE:-smtp}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-SPP Prácticas Pedagógicas <no-reply@spp.local>}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+
+      # Envío y tareas programadas
+      JOBS_ENABLED: ${JOBS_ENABLED:-true}
+      JOBS_INTERVAL_MS: ${JOBS_INTERVAL_MS:-900000}
+      REMINDER_HOURS: ${REMINDER_HOURS:-24}
+      DIGEST_HOUR: ${DIGEST_HOUR:-7}
+      DISPATCH_INTERVAL_MS: ${DISPATCH_INTERVAL_MS:-10000}
+      MAX_ATTEMPTS: ${MAX_ATTEMPTS:-5}
+
+volumes:
+  mongo-data:
