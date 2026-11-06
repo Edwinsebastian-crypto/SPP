@@ -50,7 +50,7 @@ export function scrollAppShellToReveal(element, margin = 16) {
     }
 }
 
-function updateAppTopbarOffset() {
+export function updateAppTopbarOffset() {
     if (!isMobileLayout()) {
         document.documentElement.style.removeProperty('--app-topbar-offset');
         return;
@@ -64,8 +64,6 @@ function updateAppTopbarOffset() {
         document.documentElement.style.setProperty('--app-topbar-offset', topbar.offsetHeight + 'px');
     }
 }
-window.SPP = window.SPP || {};
-window.SPP.updateAppTopbarOffset = updateAppTopbarOffset;
 
 function refreshMobileChromeMetrics() {
     setAppViewportHeight();
@@ -331,11 +329,12 @@ if (document.readyState === 'loading') {
     initShellDOM();
 }
 
-window.addEventListener('scroll', () => {
-    if (!isMobileLayout()) return;
-    if (window.scrollY || document.documentElement.scrollTop || document.body.scrollTop) {
-        window.scrollTo(0, 0);
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-    }
-}, { passive: true });
+export function initShell() {
+    initShellDOM();
+}
+
+export default {
+    scrollAppShellToReveal,
+    updateAppTopbarOffset,
+    initShell
+};

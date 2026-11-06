@@ -29,6 +29,9 @@ function createApp(container = createContainer()) {
   app.use('/api', createApiRouter(container));
 
   // Public configuration for the views (domain of the institutional e-mail addresses)
+  app.get('/api/config', (_req, res) => {
+    res.json({ institutionalDomain: env.institutionalDomain });
+  });
   app.get('/js/config.js', (_req, res) => {
     res.type('application/javascript').send(`window.SPP_DOMAIN = ${JSON.stringify(env.institutionalDomain)};`);
   });

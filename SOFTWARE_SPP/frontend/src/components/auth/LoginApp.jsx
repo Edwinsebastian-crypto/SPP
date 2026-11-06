@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { request } from '../../core/api';
 
 export default function LoginApp() {
     const [username, setUsername] = useState('');
@@ -45,7 +46,7 @@ export default function LoginApp() {
         setSubmitting(true);
         document.body.style.cursor = 'wait';
         try {
-            const result = await window.SPP.request('/api/auth/login', {
+            const result = await request('/api/auth/login', {
                 method: 'POST',
                 skipRedirect: true,
                 body: {

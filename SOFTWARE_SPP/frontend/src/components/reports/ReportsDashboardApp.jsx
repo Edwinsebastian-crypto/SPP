@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { get, showError } from '../../core/api';
+import { openExport, registry, resetTab, datasetsToJson } from '../../core/reports-kit';
 import {
     fmt,
     pct,
@@ -1573,14 +1575,12 @@ export default function ReportsDashboardApp() {
     const [errorMsg, setErrorMsg] = useState(null);
 
     const exportTabs = useCallback((currentKey) => {
-        const K = window.SPP?.reportKit;
-        if (!K || !K.openExport) return;
         const ordered = TABS.slice().sort((a, b) =>
             a.key === currentKey ? -1 : b.key === currentKey ? 1 : 0
         );
         const sections = [];
         ordered.forEach((tab) => {
-            const entry = K.registry.get(tab.key);
+            const entry = registry.get(tab.key);
             if (!entry) return;
             entry.datasets.forEach((ds) =>
                 sections.push({
@@ -1594,7 +1594,7 @@ export default function ReportsDashboardApp() {
             );
         });
         const current = TABS.find((t) => t.key === currentKey);
-        K.openExport({
+        openExport({
             title: 'Export reports',
             subtitle:
                 'Choose the information you need. You can include other tabs too.',
@@ -1602,7 +1602,7 @@ export default function ReportsDashboardApp() {
             build: ({ sections: selected }) => {
                 const datasets = [];
                 TABS.forEach((tab) => {
-                    const entry = K.registry.get(tab.key);
+                    const entry = registry.get(tab.key);
                     if (!entry) return;
                     entry.datasets.forEach((ds) => {
                         if (selected.has(`${tab.key}:${ds.id}`))
@@ -1631,7 +1631,7 @@ export default function ReportsDashboardApp() {
                     json: {
                         title: only ? `Reports · ${only.label}` : 'Reports',
                         generatedAt: new Date().toISOString(),
-                        data: K.datasetsToJson(
+                        data: datasetsToJson(
                             datasets.map((d) => ({ ...d, columns: d.columns }))
                         ),
                     },
@@ -1656,18 +1656,15 @@ export default function ReportsDashboardApp() {
             ) {
                 window.SPP_ACCREDITATION.reload().catch(() => {});
             }
-            const res = await window.SPP.get('/api/reports/dashboard');
-            const K = window.SPP?.reportKit;
-            if (K && K.resetTab) {
-                TABS.forEach((tab) => K.resetTab(tab.key, tab.label));
-            }
+            const res = await get('/api/reports/dashboard');
+            TABS.forEach((tab) => resetTab(tab.key, tab.label));
             setErrorMsg(null);
             setDashboard(res.dashboard);
         } catch (err) {
             setErrorMsg(
                 (err && err.message) || 'The reports could not be loaded.'
             );
-            if (window.SPP?.showError) window.SPP.showError(err);
+            showError(err);
         } finally {
             setLoading(false);
             document.body.classList.remove('is-loading-wait');

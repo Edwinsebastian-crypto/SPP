@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { showError } from '../../core/api';
+import { openExport as openExportKit } from '../../core/reports-kit';
+import { sync as syncCustomSelect } from '../../core/custom-select';
+import { useCustomSelect } from '../../hooks/useCustomSelect';
 import {
     TIPOS,
     fecha,
@@ -315,11 +319,6 @@ export default function DirectorEvaluationsDashboardApp() {
             setResumen(r);
             setTodasLasEvaluaciones(listRes?.items || []);
             setLimiteMostrado(15);
-            requestAnimationFrame(() => {
-                if (window.SPP?.customSelect?.init) {
-                    window.SPP.customSelect.init('#dv-lista');
-                }
-            });
         } catch (e) {
             setErrorPanel(
                 (e && e.message) || 'Could not load information.'
@@ -511,18 +510,16 @@ export default function DirectorEvaluationsDashboardApp() {
     }, [etiquetaPractica, nombreTutor]);
 
     const handleExportEvaluations = () => {
-        const K = window.SPP?.reportKit;
-        if (!K) return;
         const datasets = datosExportables();
         if (!datasets.length) {
-            window.SPP?.showError?.(
+            showError(
                 new Error(
                     'The evaluations are still loading. Try again in a moment.'
                 )
             );
             return;
         }
-        K.openExport({
+        openExportKit({
             title: 'Export evaluations',
             subtitle:
                 'Figures and grades only. Student answers and tutor comments are never included.',
@@ -600,13 +597,15 @@ export default function DirectorEvaluationsDashboardApp() {
         };
     }, [cargarPanel, datosExportables]);
 
+    useCustomSelect('#dv-lista', [todasLasEvaluaciones]);
+
     const filtrarTutor = (idTutor) => {
         setFilterTutor(String(idTutor));
         setLimiteMostrado(15);
         requestAnimationFrame(() => {
-            if (tutorSelectRef.current && window.SPP?.customSelect?.sync) {
+            if (tutorSelectRef.current) {
                 tutorSelectRef.current.value = String(idTutor);
-                window.SPP.customSelect.sync(tutorSelectRef.current);
+                syncCustomSelect(tutorSelectRef.current);
             }
             const lista = document.getElementById('dv-lista');
             if (lista) lista.scrollIntoView({ behavior: 'smooth' });
@@ -620,15 +619,13 @@ export default function DirectorEvaluationsDashboardApp() {
         setSoloAlertas(false);
         setLimiteMostrado(15);
         requestAnimationFrame(() => {
-            if (window.SPP?.customSelect?.sync) {
-                if (statusSelectRef.current) {
-                    statusSelectRef.current.value = '';
-                    window.SPP.customSelect.sync(statusSelectRef.current);
-                }
-                if (tutorSelectRef.current) {
-                    tutorSelectRef.current.value = '';
-                    window.SPP.customSelect.sync(tutorSelectRef.current);
-                }
+            if (statusSelectRef.current) {
+                statusSelectRef.current.value = '';
+                syncCustomSelect(statusSelectRef.current);
+            }
+            if (tutorSelectRef.current) {
+                tutorSelectRef.current.value = '';
+                syncCustomSelect(tutorSelectRef.current);
             }
         });
     };

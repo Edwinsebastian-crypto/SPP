@@ -1,4 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { get, session, ROLES, formatDate as apiFormatDate, formatActivityDate as apiFormatActivityDate } from '../../core/api';
+import { sync as syncCustomSelect } from '../../core/custom-select';
+import { showPanel } from '../../core/panels';
+import { EVENTS, emit, on } from '../../core/events';
 
 const REFRESH_AFTER_MS = 30000;
 const STATUS_PILL = {
@@ -70,8 +74,7 @@ function HmRing({ pct, center, small, label }) {
 }
 
 function HmHero({ user, text, actions, ringNode, onAction }) {
-    const ROLE_LABELS = (window.SPP && window.SPP.ROLES) || {};
-    const roleLabel = (user && (ROLE_LABELS[user.role] || user.role)) || '';
+    const roleLabel = (user && (ROLES[user.role] || user.role)) || '';
     const firstName = (user && user.firstName) || '';
     return (
         <section className="hm-hero" aria-label="Welcome">
@@ -238,10 +241,8 @@ export default function HomeApp() {
     const userRef = useRef(null);
     const homeDataRef = useRef(null);
 
-    const formatDate = (v) =>
-        window.SPP && window.SPP.formatDate ? window.SPP.formatDate(v) : v || '—';
-    const formatActivityDate = (v) =>
-        window.SPP && window.SPP.formatActivityDate ? window.SPP.formatActivityDate(v) : v || '—';
+    const formatDate = (v) => apiFormatDate(v) || '—';
+    const formatActivityDate = (v) => apiFormatActivityDate(v) || '—';
 
     const go = useCallback((hash) => {
         const link = document.querySelector('.app-navigation a[href="' + hash + '"]');
@@ -272,26 +273,13 @@ export default function HomeApp() {
                 Array.from(select.options).some((o) => o.value === String(practiceId))
             ) {
                 select.value = String(practiceId);
-                if (window.SPP && window.SPP.customSelect && window.SPP.customSelect.sync) {
-                    window.SPP.customSelect.sync(select);
-                }
+                syncCustomSelect(select);
                 select.dispatchEvent(new Event('change', { bubbles: true }));
             }
 
-            const practicePanel = document.querySelector('#practice .practice-panel');
-            if (practicePanel) practicePanel.style.display = 'none';
-            const logbookPanel = document.getElementById('logbook-panel');
-            if (logbookPanel) logbookPanel.style.display = 'none';
-            const actPanel = document.getElementById('activities-panel');
-            if (actPanel) actPanel.style.display = 'none';
-            const evPanel = document.getElementById('evidences-panel');
-            if (evPanel) evPanel.style.display = 'flex';
+            showPanel('evidences-panel', 'flex');
 
-            window.dispatchEvent(
-                new CustomEvent('spp:open-activity', {
-                    detail: { practiceId, activityId }
-                })
-            );
+            emit(EVENTS.OPEN_ACTIVITY, { practiceId, activityId });
             window.scrollTo(0, 0);
         },
         [go]
@@ -308,35 +296,16 @@ export default function HomeApp() {
                 Array.from(select.options).some((o) => o.value === String(practiceId))
             ) {
                 select.value = String(practiceId);
-                if (window.SPP && window.SPP.customSelect && window.SPP.customSelect.sync) {
-                    window.SPP.customSelect.sync(select);
-                }
+                syncCustomSelect(select);
                 select.dispatchEvent(new Event('change', { bubbles: true }));
             }
 
-            const practicePanel = document.querySelector('#practice .practice-panel');
-            if (practicePanel) practicePanel.style.display = 'none';
-            const logbookPanel = document.getElementById('logbook-panel');
-            if (logbookPanel) logbookPanel.style.display = 'none';
-            const questionsPanel = document.getElementById('questions-panel');
-            if (questionsPanel) questionsPanel.style.display = 'none';
-            const evPanel = document.getElementById('evidences-panel');
-            if (evPanel) evPanel.style.display = 'none';
-            const actPanel = document.getElementById('activities-panel');
-            if (actPanel) actPanel.style.display = 'flex';
+            showPanel('activities-panel', 'flex');
 
-            window.dispatchEvent(
-                new CustomEvent('spp:open-upload-evidence', {
-                    detail: { practiceId }
-                })
-            );
+            emit(EVENTS.OPEN_UPLOAD_EVIDENCE, { practiceId });
 
             setTimeout(() => {
-                window.dispatchEvent(
-                    new CustomEvent('spp:open-upload-evidence', {
-                        detail: { practiceId }
-                    })
-                );
+                emit(EVENTS.OPEN_UPLOAD_EVIDENCE, { practiceId });
                 const modal = document.getElementById('am-modal');
                 if (!modal) {
                     const btn = document.getElementById('amOpenBtnActivities');
@@ -363,7 +332,7 @@ export default function HomeApp() {
             }
             const currentUser = userRef.current;
             if (currentUser && currentUser.role === 'director') {
-                window.dispatchEvent(new CustomEvent('spp:open-practice', { detail: { id } }));
+                emit(EVENTS.OPEN_PRACTICE, { id });
                 go('#practice');
                 return;
             }
@@ -376,9 +345,7 @@ export default function HomeApp() {
                 Array.from(select.options).some((o) => o.value === String(id))
             ) {
                 select.value = String(id);
-                if (window.SPP && window.SPP.customSelect && window.SPP.customSelect.sync) {
-                    window.SPP.customSelect.sync(select);
-                }
+                syncCustomSelect(select);
                 select.dispatchEvent(new Event('change', { bubbles: true }));
             }
             enterPractice();
@@ -403,11 +370,7 @@ export default function HomeApp() {
             (x) => String(x.id) === String(id) || String(x.documentNumber) === String(id)
         );
         if (u) {
-            if (window.SPP && window.SPP.openUserModal) {
-                window.SPP.openUserModal(u);
-            } else {
-                window.dispatchEvent(new CustomEvent('spp:open-user-modal', { detail: { user: u } }));
-            }
+            emit(EVENTS.OPEN_USER_MODAL, { user: u });
         }
     }, []);
 
@@ -423,8 +386,6 @@ export default function HomeApp() {
     );
 
     const load = useCallback(async (force) => {
-        const SPP = window.SPP;
-        if (!SPP) return;
         if (loadingRef.current || (!force && Date.now() - lastLoadRef.current < REFRESH_AFTER_MS)) {
             return;
         }
@@ -433,11 +394,11 @@ export default function HomeApp() {
         setError(null);
         try {
             if (!userRef.current) {
-                const u = await SPP.session();
+                const u = await session();
                 userRef.current = u;
                 setUser(u);
             }
-            const { home } = await SPP.get('/api/home');
+            const { home } = await get('/api/home');
             homeDataRef.current = home;
             setHomeData(home);
             lastLoadRef.current = Date.now();
@@ -454,7 +415,7 @@ export default function HomeApp() {
         const onHomeRefresh = () => load(true);
         const onHomeLinkClick = () => load(false);
 
-        window.addEventListener('spp:home-refresh', onHomeRefresh);
+        const unsubHome = on(EVENTS.HOME_REFRESH, onHomeRefresh);
         if (homeLink) homeLink.addEventListener('click', onHomeLinkClick);
 
         const hash = window.location.hash;
@@ -465,7 +426,7 @@ export default function HomeApp() {
         }
 
         return () => {
-            window.removeEventListener('spp:home-refresh', onHomeRefresh);
+            unsubHome();
             if (homeLink) homeLink.removeEventListener('click', onHomeLinkClick);
         };
     }, [load]);

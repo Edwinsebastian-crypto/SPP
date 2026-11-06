@@ -1,5 +1,11 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { get, patch, del, showError, formatDate as apiFormatDate, EvalAPI } from '../../core/api';
+import { alert as alertModal, confirm as confirmModal } from '../../core/modals';
+import { resetScroll as panelResetScroll, showPanel } from '../../core/panels';
+import { sync as syncCustomSelect } from '../../core/custom-select';
+import { useCustomSelect } from '../../hooks/useCustomSelect';
+import { EVENTS, emit, on } from '../../core/events';
 
 const STATUS_COLORS = { active: '#265c48', completed: '#6b7280', cancelled: '#b3261e' };
 
@@ -41,10 +47,7 @@ function computeLogbookHero(logbook) {
 }
 
 function resetScroll() {
-    if (window.SPP && window.SPP.panels && window.SPP.panels.resetScroll) {
-        window.SPP.panels.resetScroll();
-        return;
-    }
+    panelResetScroll();
     window.scrollTo(0, 0);
     const appShell = document.querySelector('.app-shell');
     if (appShell) appShell.scrollTop = 0;
@@ -96,8 +99,7 @@ export default function PracticeAndLogbookApp({ role }) {
     practicesRef.current = practices;
     currentPracticeRef.current = currentPractice;
 
-    const formatDate = (val) =>
-        window.SPP && window.SPP.formatDate ? window.SPP.formatDate(val) : val || '—';
+    const formatDate = (val) => apiFormatDate(val) || val || '—';
 
     // Locate target DOM containers on mount
     useEffect(() => {
@@ -153,7 +155,7 @@ export default function PracticeAndLogbookApp({ role }) {
                 return;
             }
 
-            const evalApi = window.EvalAPI || (window.SPP && window.SPP.EvalAPI);
+            const evalApi = EvalAPI || window.EvalAPI;
             if (!evalApi) {
                 setPillState('Up to date', false);
                 return;
@@ -431,24 +433,19 @@ export default function PracticeAndLogbookApp({ role }) {
 
             if (role === 'student') {
                 window.SPP_STUDENT_PRACTICE = practiceObj;
-                window.dispatchEvent(
-                    new CustomEvent('spp:student-practice', { detail: { practice: practiceObj } })
-                );
+                emit(EVENTS.STUDENT_PRACTICE, { practice: practiceObj });
             } else if (role === 'tutor' || role === 'advisor') {
                 window.SPP_TEACHER = window.SPP_TEACHER || { state: {} };
                 window.SPP_TEACHER.state = window.SPP_TEACHER.state || {};
                 window.SPP_TEACHER.state.practices = listOverride || practicesRef.current;
                 window.SPP_TEACHER.state.practice = practiceObj;
-                document.dispatchEvent(new CustomEvent('spp:practice', { detail: practiceObj }));
+                emit(EVENTS.PRACTICE, practiceObj, document);
+                emit(EVENTS.PRACTICE, practiceObj, window);
             } else if (role === 'director') {
                 window.SPP_DIRECTOR = window.SPP_DIRECTOR || {};
                 window.SPP_DIRECTOR.currentPractice = practiceObj;
                 window.SPP_DIRECTOR.getCurrentPractice = () => currentPracticeRef.current;
-                window.dispatchEvent(
-                    new CustomEvent('spp:director-practice-changed', {
-                        detail: { practice: practiceObj }
-                    })
-                );
+                emit(EVENTS.DIRECTOR_PRACTICE_CHANGED, { practice: practiceObj });
             }
 
             await updateQuestionsPill(practiceObj);
@@ -459,10 +456,8 @@ export default function PracticeAndLogbookApp({ role }) {
     // Load practices from API
     const loadPractices = useCallback(
         async (preferredId = null) => {
-            const SPP = window.SPP;
-            if (!SPP) return;
             try {
-                const res = await SPP.get('/api/practices');
+                const res = await get('/api/practices');
                 const list = (res && res.practices) || [];
                 setPractices(list);
                 practicesRef.current = list;
@@ -488,7 +483,7 @@ export default function PracticeAndLogbookApp({ role }) {
                 }
             } catch (err) {
                 setLoading(false);
-                if (SPP.showError) SPP.showError(err);
+                showError(err);
             }
         },
         [role, selectPractice]
@@ -497,8 +492,12 @@ export default function PracticeAndLogbookApp({ role }) {
     // Expose global helpers expected by evaluations & other apps
     useEffect(() => {
         if (role === 'student') {
+            const unsub = on(EVENTS.UPDATE_STUDENT_QUESTIONS_PILL, () =>
+                updateQuestionsPill(currentPracticeRef.current, null, true)
+            );
             window.updateStudentQuestionsPill = () =>
                 updateQuestionsPill(currentPracticeRef.current, null, true);
+            return unsub;
         } else if (role === 'tutor' || role === 'advisor') {
             window.SPP_TEACHER = window.SPP_TEACHER || {
                 state: {
@@ -516,8 +515,8 @@ export default function PracticeAndLogbookApp({ role }) {
             };
             window.SPP_TEACHER.reloadLogbook = async () => {
                 const cur = currentPracticeRef.current;
-                if (!cur || !window.SPP) return;
-                const { practice: fresh } = await window.SPP.get(`/api/practices/${cur.id}`);
+                if (!cur) return;
+                const { practice: fresh } = await get(`/api/practices/${cur.id}`);
                 setPractices((prev) => prev.map((p) => (p.id === fresh.id ? fresh : p)));
                 setCurrentPractice(fresh);
                 currentPracticeRef.current = fresh;
@@ -536,65 +535,41 @@ export default function PracticeAndLogbookApp({ role }) {
     useEffect(() => {
         loadPractices();
 
-        const handleOpenPractice = (e) => {
-            const id = e.detail && e.detail.id;
+        const unsubOpen = on(EVENTS.OPEN_PRACTICE, (detail) => {
+            const id = detail && detail.id;
             if (!id) return;
             const found = practicesRef.current.find((p) => String(p.id) === String(id));
             if (found) {
                 selectPractice(found);
                 if (selectorRef.current) {
                     selectorRef.current.value = String(found.id);
-                    if (window.SPP && window.SPP.customSelect) {
-                        window.SPP.customSelect.sync(selectorRef.current);
-                    }
+                    syncCustomSelect(selectorRef.current);
                 }
                 // Enter logbook automatically
-                const pPanel = document.querySelector('#practice .practice-panel');
-                const lPanel = document.getElementById('logbook-panel');
-                if (pPanel && lPanel) {
-                    pPanel.style.display = 'none';
-                    lPanel.style.display = role === 'director' ? 'block' : 'flex';
-                    resetScroll();
-                }
+                showPanel('logbook-panel', role === 'director' ? 'block' : 'flex');
             }
-        };
+        });
 
-        const handlePracticesChanged = (e) => {
-            const preferredId = e.detail && e.detail.id;
+        const unsubChanged = on(EVENTS.PRACTICES_CHANGED, (detail) => {
+            const preferredId = detail && detail.id;
             loadPractices(preferredId);
-        };
-
-        window.addEventListener('spp:open-practice', handleOpenPractice);
-        window.addEventListener('spp:practices-changed', handlePracticesChanged);
+        });
 
         return () => {
-            window.removeEventListener('spp:open-practice', handleOpenPractice);
-            window.removeEventListener('spp:practices-changed', handlePracticesChanged);
+            unsubOpen();
+            unsubChanged();
         };
     }, [loadPractices, selectPractice, role]);
 
     // Sync customSelect for tutor/advisor/director practice selector
-    useEffect(() => {
-        if (role === 'student') return;
-        const box = selectorBoxRef.current;
-        const sel = selectorRef.current;
-        if (!box || !sel || !window.SPP || !window.SPP.customSelect) return;
-
-        window.SPP.customSelect.init(box);
-        window.SPP.customSelect.rebuild(sel);
-        window.SPP.customSelect.sync(sel);
-    }, [role, practices, currentPractice, practicePanelEl]);
+    useCustomSelect([selectorBoxRef, selectorRef], [role, practices, currentPractice, practicePanelEl]);
 
     // Wire `#questionsBack` button in `#questions-panel`
     useEffect(() => {
         const qBack = document.getElementById('questionsBack');
         if (!qBack) return;
         const handleBack = () => {
-            const qPanel = document.getElementById('questions-panel');
-            const lPanel = document.getElementById('logbook-panel');
-            if (qPanel) qPanel.style.display = 'none';
-            if (lPanel) lPanel.style.display = role === 'director' ? 'block' : 'flex';
-            resetScroll();
+            showPanel('logbook-panel', role === 'director' ? 'block' : 'flex');
             if (
                 role === 'director' &&
                 window.SPP_EVAL_DIRECTOR &&
@@ -647,31 +622,19 @@ export default function PracticeAndLogbookApp({ role }) {
     // Handlers
     const handleEnterLogbook = () => {
         if (!currentPractice) return;
-        if (practicePanelEl) practicePanelEl.style.display = 'none';
-        if (logbookPanelEl) logbookPanelEl.style.display = role === 'director' ? 'block' : 'flex';
-        resetScroll();
+        showPanel('logbook-panel', role === 'director' ? 'block' : 'flex');
     };
 
     const handleBackToPractice = () => {
-        if (logbookPanelEl) logbookPanelEl.style.display = 'none';
-        if (practicePanelEl) practicePanelEl.style.display = 'block';
-        resetScroll();
+        showPanel('practice-panel', 'block');
     };
 
     const handleEnterActivities = () => {
-        const actPanel = document.getElementById('activities-panel');
-        const qPanel = document.getElementById('questions-panel');
-        if (logbookPanelEl) logbookPanelEl.style.display = 'none';
-        if (qPanel) qPanel.style.display = 'none';
-        if (actPanel) actPanel.style.display = 'flex';
-        resetScroll();
+        showPanel('activities-panel', 'flex');
     };
 
     const handleEnterQuestions = () => {
-        const qPanel = document.getElementById('questions-panel');
-        if (logbookPanelEl) logbookPanelEl.style.display = 'none';
-        if (qPanel) qPanel.style.display = role === 'director' ? 'block' : 'flex';
-        resetScroll();
+        showPanel('questions-panel', role === 'director' ? 'block' : 'flex');
         if (
             role === 'student' &&
             window.SPP_EVAL_ESTUDIANTE &&
@@ -706,12 +669,12 @@ export default function PracticeAndLogbookApp({ role }) {
 
     const handleSaveTutorEdit = async (e) => {
         e.stopPropagation();
-        if (!currentPractice || !window.SPP) return;
+        if (!currentPractice) return;
         const nuevaNota = String(gradeInput).trim();
         const nuevaObs = String(obsInput).trim();
 
         try {
-            await window.SPP.patch('/api/practices/' + currentPractice.id + '/logbook', {
+            await patch('/api/practices/' + currentPractice.id + '/logbook', {
                 finalGrade: nuevaNota || null,
                 generalObservation: nuevaObs || null
             });
@@ -737,22 +700,20 @@ export default function PracticeAndLogbookApp({ role }) {
                 await window.SPP_TEACHER.reloadLogbook();
             }
         } catch (err) {
-            if (window.SPP.showError) window.SPP.showError(err);
+            showError(err);
         }
     };
 
     const handleEditPracticeDirector = () => {
         setDirMenuOpen(false);
         if (!currentPractice) return;
-        window.dispatchEvent(
-            new CustomEvent('spp:edit-practice', { detail: { practice: currentPractice } })
-        );
+        emit(EVENTS.EDIT_PRACTICE, { practice: currentPractice });
     };
 
     const handleDeletePracticeDirector = async () => {
         setDirMenuOpen(false);
-        if (!currentPractice || !window.SPP) return;
-        const confirmed = await window.SPP.modals.confirm({
+        if (!currentPractice) return;
+        const confirmed = await confirmModal({
             title: 'Delete practice',
             message:
                 'Are you sure you want to delete this practice? will be permanently deleted.\n\nThis action cannot be undone.',
@@ -760,18 +721,18 @@ export default function PracticeAndLogbookApp({ role }) {
         });
         if (!confirmed) return;
         try {
-            await window.SPP.del(`/api/practices/${currentPractice.id}`);
+            await del(`/api/practices/${currentPractice.id}`);
             await loadPractices();
             if (window.SPP_REPORTS && window.SPP_REPORTS.reload) {
                 window.SPP_REPORTS.reload();
             }
-            window.dispatchEvent(new CustomEvent('spp:home-refresh'));
-            await window.SPP.modals.alert({
+            emit(EVENTS.HOME_REFRESH);
+            await alertModal({
                 title: 'Practice deleted',
                 message: 'The practice was deleted successfully.'
             });
         } catch (err) {
-            if (window.SPP.showError) window.SPP.showError(err);
+            showError(err);
         }
     };
 

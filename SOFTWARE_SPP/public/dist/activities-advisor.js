@@ -1,1 +1,1 @@
-import"./chunks/client-Cj5eqLnb.js";import{m as i,a as o}from"./chunks/panel-common-mount-JQBNTuA3.js";import"./chunks/custom-select-W5Mf8IKS.js";function t(){i("advisor"),o("advisor")}document.readyState==="loading"?document.addEventListener("DOMContentLoaded",t):t();
+import"./chunks/client-DLEGxcP2.js";import{m as i,a as o}from"./chunks/panel-common-mount-BfJbLzyb.js";import"./chunks/custom-select-B1aR3-dY.js";function t(){i("advisor"),o("advisor")}document.readyState==="loading"?document.addEventListener("DOMContentLoaded",t):t();

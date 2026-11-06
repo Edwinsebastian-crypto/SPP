@@ -1,5 +1,10 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { get, post, put, patch, del } from '../../core/api';
+import { alert as alertModal, confirm as confirmModal } from '../../core/modals';
+import { resetScroll } from '../../core/panels';
+import { useCustomSelect } from '../../hooks/useCustomSelect';
+import { EVENTS, emit, on } from '../../core/events';
 
 const ROLES = {
     student: { name: 'Student', icon: 'fa-graduation-cap', cssClass: '' },
@@ -165,7 +170,21 @@ function CredentialCard({
 }
 
 export default function ManageUsersApp() {
-    const domain = '@' + (window.SPP_DOMAIN || 'university.edu');
+    const [institutionalDomain, setInstitutionalDomain] = useState(
+        typeof window !== 'undefined' && window.SPP_DOMAIN ? window.SPP_DOMAIN : 'university.edu'
+    );
+
+    useEffect(() => {
+        get('/api/config')
+            .then((cfg) => {
+                if (cfg && cfg.institutionalDomain) {
+                    setInstitutionalDomain(cfg.institutionalDomain);
+                }
+            })
+            .catch(() => {});
+    }, []);
+
+    const domain = '@' + institutionalDomain;
 
     const [activeTab, setActiveTab] = useState('um-panel-register');
     const [users, setUsers] = useState([]);
@@ -212,10 +231,8 @@ export default function ManageUsersApp() {
 
     // Load programs & users
     const loadPrograms = useCallback(async () => {
-        const SPP = window.SPP;
-        if (!SPP) return;
         try {
-            const res = await SPP.get('/api/users/programs');
+            const res = await get('/api/users/programs');
             setPrograms((res && res.programs) || []);
         } catch (_) {
             // fallback
@@ -223,17 +240,15 @@ export default function ManageUsersApp() {
     }, []);
 
     const loadUsers = useCallback(async () => {
-        const SPP = window.SPP;
-        if (!SPP) return;
         try {
             const [res, pracRes] = await Promise.all([
-                SPP.get('/api/users'),
-                SPP.get('/api/practices')
+                get('/api/users'),
+                get('/api/practices')
             ]);
             const list = res && res.users ? res.users.filter((u) => u.role !== 'director') : [];
             setUsers(list);
             setAllPractices((pracRes && pracRes.practices) || []);
-            window.dispatchEvent(new Event('spp:dataChanged'));
+            emit(EVENTS.DATA_CHANGED);
         } catch (_) {
             setUsers([]);
             setAllPractices([]);
@@ -244,39 +259,31 @@ export default function ManageUsersApp() {
         loadPrograms();
         loadUsers();
 
-        const handlePracticesChanged = () => loadUsers();
-        window.addEventListener('spp:practices-changed', handlePracticesChanged);
-        return () => window.removeEventListener('spp:practices-changed', handlePracticesChanged);
+        return on(EVENTS.PRACTICES_CHANGED, () => loadUsers());
     }, [loadPrograms, loadUsers]);
 
     // Sync customSelects
-    useEffect(() => {
-        const SPP = window.SPP;
-        if (!SPP || !SPP.customSelect || !rootRef.current) return;
-        SPP.customSelect.init(rootRef.current);
+    useCustomSelect(
         [
-            docTypeSelectRef.current,
-            programSelectRef.current,
-            roleFilterSelectRef.current,
-            statusFilterSelectRef.current,
-            rowsSelectRef.current
-        ].forEach((sel) => {
-            if (sel) {
-                SPP.customSelect.rebuild(sel);
-                SPP.customSelect.sync(sel);
-            }
-        });
-    }, [
-        programs,
-        documentType,
-        program,
-        role,
-        roleFilter,
-        statusFilter,
-        rowsPerPage,
-        activeTab,
-        editingId
-    ]);
+            rootRef,
+            docTypeSelectRef,
+            programSelectRef,
+            roleFilterSelectRef,
+            statusFilterSelectRef,
+            rowsSelectRef
+        ],
+        [
+            programs,
+            documentType,
+            program,
+            role,
+            roleFilter,
+            statusFilter,
+            rowsPerPage,
+            activeTab,
+            editingId
+        ]
+    );
 
     // Credential modal setup
     const closeModals = useCallback(() => {
@@ -291,8 +298,8 @@ export default function ManageUsersApp() {
         const normalized = { ...user, id: user.id || user.documentNumber };
         let activePid = null;
         try {
-            if (normalized.role === 'student' && normalized.id && window.SPP) {
-                const res = await window.SPP.get('/api/practices');
+            if (normalized.role === 'student' && normalized.id) {
+                const res = await get('/api/practices');
                 if (res && res.practices) {
                     const userPractices = res.practices.filter(
                         (p) => String(p.studentDocument) === String(normalized.id)
@@ -317,13 +324,9 @@ export default function ManageUsersApp() {
             setModalBodyEl(body);
         }
 
-        if (window.SPP) {
-            window.SPP.openUserModal = openCredential;
-        }
-        const handleOpenModalEvent = (e) => {
-            if (e.detail && e.detail.user) openCredential(e.detail.user);
-        };
-        window.addEventListener('spp:open-user-modal', handleOpenModalEvent);
+        const unsubModal = on(EVENTS.OPEN_USER_MODAL, (detail) => {
+            if (detail && detail.user) openCredential(detail.user);
+        });
 
         const closeBtns = Array.from(document.querySelectorAll('[data-um-close]'));
         closeBtns.forEach((b) => b.addEventListener('click', closeModals));
@@ -340,7 +343,7 @@ export default function ManageUsersApp() {
         document.addEventListener('keydown', handleKey);
 
         return () => {
-            window.removeEventListener('spp:open-user-modal', handleOpenModalEvent);
+            unsubModal();
             closeBtns.forEach((b) => b.removeEventListener('click', closeModals));
             if (modal) modal.removeEventListener('click', handleOverlayClick);
             document.removeEventListener('keydown', handleKey);
@@ -444,9 +447,7 @@ export default function ManageUsersApp() {
     const goToStep = (target) => {
         const clamped = Math.min(Math.max(target, 1), 4);
         setCurrentStep(clamped);
-        if (window.SPP && window.SPP.panels && window.SPP.panels.resetScroll) {
-            window.SPP.panels.resetScroll();
-        }
+        resetScroll();
     };
 
     const handleNextStep = () => {
@@ -501,9 +502,7 @@ export default function ManageUsersApp() {
         setShowPassInput(false);
         setErrors({});
         setCurrentStep(1);
-        if (window.SPP && window.SPP.panels && window.SPP.panels.resetScroll) {
-            window.SPP.panels.resetScroll();
-        }
+        resetScroll();
     }, []);
 
     const handleFormSubmit = async (e) => {
@@ -514,8 +513,6 @@ export default function ManageUsersApp() {
                 return;
             }
         }
-        const SPP = window.SPP;
-        if (!SPP) return;
 
         const body = {
             firstName: firstName.trim(),
@@ -532,23 +529,23 @@ export default function ManageUsersApp() {
         setSubmitting(true);
         try {
             if (editingId) {
-                await SPP.put('/api/users/' + encodeURIComponent(editingId), body);
-                await SPP.modals.alert({
+                await put('/api/users/' + encodeURIComponent(editingId), body);
+                await alertModal({
                     title: 'User updated',
                     message: 'User updated successfully'
                 });
             } else {
-                await SPP.post('/api/users', body);
-                await SPP.modals.alert({
+                await post('/api/users', body);
+                await alertModal({
                     title: 'User registered',
                     message: 'User registered successfully'
                 });
             }
             clearForm();
             await loadUsers();
-            window.dispatchEvent(new CustomEvent('spp:home-refresh'));
+            emit(EVENTS.HOME_REFRESH);
         } catch (err) {
-            await SPP.modals.alert({
+            await alertModal({
                 title: 'Could not save',
                 message: err.message || 'Error saving user'
             });
@@ -578,30 +575,26 @@ export default function ManageUsersApp() {
         setErrors({});
         setActiveTab('um-panel-register');
         setCurrentStep(1);
-        if (window.SPP && window.SPP.panels && window.SPP.panels.resetScroll) {
-            window.SPP.panels.resetScroll();
-        }
+        resetScroll();
     };
 
     const handleApproveUser = async (user, fromModal = false) => {
-        const SPP = window.SPP;
-        if (!SPP) return;
         const uid = user.id || user.documentNumber;
         try {
-            await SPP.patch('/api/users/' + encodeURIComponent(uid) + '/status', {
+            await patch('/api/users/' + encodeURIComponent(uid) + '/status', {
                 status: 'active'
             });
             if (fromModal) closeModals();
             await loadUsers();
-            window.dispatchEvent(new CustomEvent('spp:home-refresh'));
+            emit(EVENTS.HOME_REFRESH);
             if (fromModal) {
-                await SPP.modals.alert({
+                await alertModal({
                     title: 'User accepted',
                     message: 'The user has been activated successfully.'
                 });
             }
         } catch (err) {
-            await SPP.modals.alert({
+            await alertModal({
                 title: 'Could not accept the registration',
                 message: err.message
             });
@@ -609,11 +602,9 @@ export default function ManageUsersApp() {
     };
 
     const handleRejectUser = async (user, fromModal = false) => {
-        const SPP = window.SPP;
-        if (!SPP) return;
         const uid = user.id || user.documentNumber;
         const name = user.name || fullName(user) || 'user';
-        const rejected = await SPP.modals.confirm({
+        const rejected = await confirmModal({
             title: 'Reject ' + name,
             message: 'The registration request and its access account will be deleted.',
             confirmLabel: 'Yes, reject',
@@ -621,7 +612,7 @@ export default function ManageUsersApp() {
         });
         if (!rejected) return;
         try {
-            await SPP.del('/api/users/' + encodeURIComponent(uid));
+            await del('/api/users/' + encodeURIComponent(uid));
             if (fromModal) closeModals();
             setSelectedIds((prev) => {
                 const next = new Set(prev);
@@ -629,15 +620,15 @@ export default function ManageUsersApp() {
                 return next;
             });
             await loadUsers();
-            window.dispatchEvent(new CustomEvent('spp:home-refresh'));
+            emit(EVENTS.HOME_REFRESH);
             if (fromModal) {
-                await SPP.modals.alert({
+                await alertModal({
                     title: 'Registration rejected',
                     message: 'The user registration has been rejected and deleted.'
                 });
             }
         } catch (err) {
-            await SPP.modals.alert({
+            await alertModal({
                 title: 'Could not reject the registration',
                 message: err.message
             });
@@ -645,9 +636,7 @@ export default function ManageUsersApp() {
     };
 
     const handleDeleteUser = async (user) => {
-        const SPP = window.SPP;
-        if (!SPP) return;
-        const confirmed = await SPP.modals.confirm({
+        const confirmed = await confirmModal({
             title: 'Delete ' + fullName(user),
             message:
                 'The user will lose access to the portal and will be removed from the list.',
@@ -656,29 +645,27 @@ export default function ManageUsersApp() {
         });
         if (!confirmed) return;
         try {
-            await SPP.del('/api/users/' + encodeURIComponent(user.id));
+            await del('/api/users/' + encodeURIComponent(user.id));
             setSelectedIds((prev) => {
                 const next = new Set(prev);
                 next.delete(user.id);
                 return next;
             });
             await loadUsers();
-            window.dispatchEvent(new CustomEvent('spp:home-refresh'));
+            emit(EVENTS.HOME_REFRESH);
         } catch (err) {
-            await SPP.modals.alert({ title: 'Could not delete', message: err.message });
+            await alertModal({ title: 'Could not delete', message: err.message });
         }
     };
 
     const handleBulkAction = async (action) => {
-        const SPP = window.SPP;
-        if (!SPP) return;
         const ids = Array.from(selectedIds);
         if (action === 'cancel') {
             setSelectedIds(new Set());
             return;
         }
         if (action === 'delete') {
-            const confirmed = await SPP.modals.confirm({
+            const confirmed = await confirmModal({
                 title: `Delete ${ids.length} user(s)`,
                 message:
                     'They will lose access to the portal and will be removed from the list.',
@@ -688,13 +675,13 @@ export default function ManageUsersApp() {
             if (!confirmed) return;
             try {
                 for (const id of ids) {
-                    await SPP.del('/api/users/' + encodeURIComponent(id));
+                    await del('/api/users/' + encodeURIComponent(id));
                 }
                 setSelectedIds(new Set());
                 await loadUsers();
-                window.dispatchEvent(new CustomEvent('spp:home-refresh'));
+                emit(EVENTS.HOME_REFRESH);
             } catch (err) {
-                await SPP.modals.alert({ title: 'Could not delete', message: err.message });
+                await alertModal({ title: 'Could not delete', message: err.message });
             }
             return;
         }
@@ -702,15 +689,15 @@ export default function ManageUsersApp() {
         const nextStatus = action === 'activate' ? 'active' : 'inactive';
         try {
             for (const id of ids) {
-                await SPP.patch('/api/users/' + encodeURIComponent(id) + '/status', {
+                await patch('/api/users/' + encodeURIComponent(id) + '/status', {
                     status: nextStatus
                 });
             }
             setSelectedIds(new Set());
             await loadUsers();
-            window.dispatchEvent(new CustomEvent('spp:home-refresh'));
+            emit(EVENTS.HOME_REFRESH);
         } catch (err) {
-            await SPP.modals.alert({ title: 'Could not update', message: err.message });
+            await alertModal({ title: 'Could not update', message: err.message });
         }
     };
 
@@ -892,13 +879,7 @@ export default function ManageUsersApp() {
                     data-um-panel="um-panel-register"
                     onClick={() => {
                         setActiveTab('um-panel-register');
-                        if (
-                            window.SPP &&
-                            window.SPP.panels &&
-                            window.SPP.panels.resetScroll
-                        ) {
-                            window.SPP.panels.resetScroll();
-                        }
+                        resetScroll();
                     }}
                 >
                     <i className="fa-solid fa-user-plus" aria-hidden="true"></i> Register User
@@ -911,13 +892,7 @@ export default function ManageUsersApp() {
                     data-um-panel="um-panel-list"
                     onClick={() => {
                         setActiveTab('um-panel-list');
-                        if (
-                            window.SPP &&
-                            window.SPP.panels &&
-                            window.SPP.panels.resetScroll
-                        ) {
-                            window.SPP.panels.resetScroll();
-                        }
+                        resetScroll();
                     }}
                 >
                     <i className="fa-solid fa-list" aria-hidden="true"></i> List Users
@@ -2038,11 +2013,7 @@ export default function ManageUsersApp() {
                           activePracticeId={modalPracticeId}
                           onOpenLogbook={(practiceId) => {
                               closeModals();
-                              window.dispatchEvent(
-                                  new CustomEvent('spp:open-practice', {
-                                      detail: { id: practiceId }
-                                  })
-                              );
+                              emit(EVENTS.OPEN_PRACTICE, { id: practiceId });
                               const link = document.querySelector(
                                   '.app-nav-link[href="#practice"]'
                               );

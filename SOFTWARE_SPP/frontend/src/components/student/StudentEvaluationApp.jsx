@@ -13,6 +13,12 @@ import {
 } from '../../utils/evalBridge';
 import { Icon, Badge, BusyButton } from '../common/Badge';
 import { Modal } from '../common/Modal';
+import { emit, EVENTS } from '../../core/events';
+
+const refreshQuestionsPill = () => {
+    emit(EVENTS.UPDATE_STUDENT_QUESTIONS_PILL);
+    window.updateStudentQuestionsPill?.();
+};
 
 function isDeadlineExpiredError(e) {
     const msg = (e && e.message) || '';
@@ -278,7 +284,7 @@ export default function StudentEvaluationApp() {
         switchView('lista');
         cargarLista();
         toast('Your progress has been saved. You can continue whenever you want.');
-        window.updateStudentQuestionsPill?.();
+        refreshQuestionsPill();
     };
 
     const enviarTodo = async () => {
@@ -305,7 +311,7 @@ export default function StudentEvaluationApp() {
             setQuizIntento(null);
             mostrarResultado(it);
             toast('Evaluation submitted.');
-            window.updateStudentQuestionsPill?.();
+            refreshQuestionsPill();
         } catch (e) {
             if (isDeadlineExpiredError(e)) {
                 setDeadlineModalOpen(true);
@@ -316,7 +322,7 @@ export default function StudentEvaluationApp() {
                     setQuizIntento(null);
                     switchView('lista');
                     cargarLista();
-                    window.updateStudentQuestionsPill?.();
+                    refreshQuestionsPill();
                 }
             }
         }
@@ -362,7 +368,7 @@ export default function StudentEvaluationApp() {
 
         const onBackClick = () => {
             switchView('lista');
-            window.updateStudentQuestionsPill?.();
+            refreshQuestionsPill();
         };
         const btnQuestionsBack = document.getElementById('questionsBack');
         if (btnQuestionsBack) {
@@ -1043,7 +1049,7 @@ export default function StudentEvaluationApp() {
                         setQuizIntento(null);
                         switchView('lista');
                         cargarLista();
-                        window.updateStudentQuestionsPill?.();
+                        refreshQuestionsPill();
                     }}
                 >
                     <p
@@ -1067,7 +1073,7 @@ export default function StudentEvaluationApp() {
                                 setQuizIntento(null);
                                 switchView('lista');
                                 cargarLista();
-                                window.updateStudentQuestionsPill?.();
+                                refreshQuestionsPill();
                             }}
                         >
                             Understood

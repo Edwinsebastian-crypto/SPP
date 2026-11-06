@@ -1,4 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { get, post, put, del, showError } from '../../core/api';
+import { alert as alertModal, confirm as confirmModal } from '../../core/modals';
+import { resetScroll } from '../../core/panels';
+import { EVENTS, emit, on } from '../../core/events';
 
 export default function InstitutionsApp() {
     const [activeTab, setActiveTab] = useState('inst-panel-register');
@@ -19,17 +23,15 @@ export default function InstitutionsApp() {
     const rootRef = useRef(null);
 
     const loadInstitutions = useCallback(async () => {
-        const SPP = window.SPP;
-        if (!SPP) return;
         try {
             const [instRes, pracRes] = await Promise.all([
-                SPP.get('/api/institutions'),
-                SPP.get('/api/practices')
+                get('/api/institutions'),
+                get('/api/practices')
             ]);
             setInstitutions(instRes.institutions || []);
             setAllPractices(pracRes.practices || []);
         } catch (err) {
-            if (SPP.showError) SPP.showError(err);
+            showError(err);
         }
     }, []);
 
@@ -55,11 +57,11 @@ export default function InstitutionsApp() {
         };
 
         if (navLink) navLink.addEventListener('click', handleNavClick);
-        window.addEventListener('spp:practices-changed', handlePracticesChanged);
+        const unsubPractices = on(EVENTS.PRACTICES_CHANGED, handlePracticesChanged);
 
         return () => {
             if (navLink) navLink.removeEventListener('click', handleNavClick);
-            window.removeEventListener('spp:practices-changed', handlePracticesChanged);
+            unsubPractices();
         };
     }, [loadInstitutions, resetForm]);
 
@@ -116,41 +118,37 @@ export default function InstitutionsApp() {
         setErrors(nextErrors);
         if (Object.keys(nextErrors).length > 0) return;
 
-        const SPP = window.SPP;
-        if (!SPP) return;
-
         const isEdit = Boolean(editingId);
         const body = { taxId, manager, address, name, email };
         try {
             let savedId = editingId;
             if (isEdit) {
-                await SPP.put(`/api/institutions/${editingId}`, body);
+                await put(`/api/institutions/${editingId}`, body);
             } else {
-                const res = await SPP.post('/api/institutions', body);
+                const res = await post('/api/institutions', body);
                 savedId = res && res.institution ? res.institution.id : null;
             }
             resetForm();
             await loadInstitutions();
-            window.dispatchEvent(new CustomEvent('spp:dataChanged'));
+            emit(EVENTS.DATA_CHANGED);
             if (window.SPP_REPORTS && window.SPP_REPORTS.reload) {
                 window.SPP_REPORTS.reload();
             }
             revealCard(savedId);
-            await SPP.modals.alert({
+            await alertModal({
                 title: isEdit ? 'Institution updated' : 'Institution created',
                 message: isEdit
                     ? 'The changes were saved and the institution now appears in the list.'
                     : 'The institution was registered successfully and already appears in the list.'
             });
         } catch (err) {
-            if (SPP.showError) SPP.showError(err);
+            showError(err);
         }
     };
 
     const handleView = (inst) => {
         setOpenMenuId(null);
-        if (!window.SPP || !window.SPP.modals) return;
-        window.SPP.modals.alert({
+        alertModal({
             title: inst.name,
             icon: 'info',
             rows: [
@@ -172,36 +170,30 @@ export default function InstitutionsApp() {
         setEmail(inst.email || '');
         setErrors({});
         setActiveTab('inst-panel-register');
-        if (window.SPP && window.SPP.panels && window.SPP.panels.resetScroll) {
-            window.SPP.panels.resetScroll();
-        } else {
-            window.scrollTo(0, 0);
-        }
+        resetScroll();
     };
 
     const handleDelete = async (inst) => {
         setOpenMenuId(null);
-        const SPP = window.SPP;
-        if (!SPP || !SPP.modals) return;
-        const confirmed = await SPP.modals.confirm({
+        const confirmed = await confirmModal({
             title: 'Delete institution',
             message: `The institution "${inst.name}" will be permanently deleted.\n\nThis action cannot be undone.`,
             confirmLabel: 'Delete'
         });
         if (!confirmed) return;
         try {
-            await SPP.del(`/api/institutions/${inst.id}`);
+            await del(`/api/institutions/${inst.id}`);
             await loadInstitutions();
-            window.dispatchEvent(new CustomEvent('spp:dataChanged'));
+            emit(EVENTS.DATA_CHANGED);
             if (window.SPP_REPORTS && window.SPP_REPORTS.reload) {
                 window.SPP_REPORTS.reload();
             }
-            await SPP.modals.alert({
+            await alertModal({
                 title: 'Institution deleted',
                 message: 'The institution was deleted successfully.'
             });
         } catch (err) {
-            if (SPP.showError) SPP.showError(err);
+            showError(err);
         }
     };
 

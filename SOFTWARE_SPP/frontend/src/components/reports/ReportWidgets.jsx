@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Icon } from '../common/Badge';
+import { register } from '../../core/reports-kit';
+import { fecha } from '../../core/ui';
 
 export const fmt = (n, decimals) =>
     n === null || n === undefined || n === '' || Number.isNaN(Number(n))
@@ -305,8 +307,8 @@ export function ReportKpis({ tab, id, title, items }) {
     const gridRef = useRef(null);
 
     useEffect(() => {
-        if (window.SPP?.reportKit?.register && gridRef.current) {
-            window.SPP.reportKit.register(tab, {
+        if (gridRef.current) {
+            register(tab, {
                 id,
                 title,
                 node: gridRef.current,
@@ -376,12 +378,8 @@ export function ReportCard({
         Boolean(dataset?.columns && dataset?.rows) && !isNoTable;
 
     useEffect(() => {
-        if (
-            !dataset?.noExport &&
-            window.SPP?.reportKit?.register &&
-            cardRef.current
-        ) {
-            window.SPP.reportKit.register(tab, {
+        if (!dataset?.noExport && cardRef.current) {
+            register(tab, {
                 ...dataset,
                 node: cardRef.current,
             });
@@ -438,9 +436,7 @@ export function ReportToolbar({
     onExport,
 }) {
     const updatedFormatted = updated
-        ? window.EvalUI?.fecha
-            ? window.EvalUI.fecha(updated)
-            : dateTime(updated)
+        ? (fecha ? fecha(updated) : dateTime(updated))
         : '';
 
     return (

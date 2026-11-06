@@ -16,6 +16,7 @@ import EvaluationModal from './EvaluationModal';
 import QuestionModal from './QuestionModal';
 import GenerateAIModal from './GenerateAIModal';
 import AttemptRowQuestion from './AttemptRowQuestion';
+import { EVENTS, on } from '../../core/events';
 
 export default function TutorEvaluationApp() {
     const qs = new URLSearchParams(window.location.search);
@@ -301,7 +302,7 @@ export default function TutorEvaluationApp() {
                 }
             }
         };
-        document.addEventListener('spp:practice', onPracticeChange);
+        const unsubPractice = on(EVENTS.PRACTICE, onPracticeChange, document);
 
         window.SPP_EVAL_TUTOR = {
             abrir: () => {
@@ -336,7 +337,7 @@ export default function TutorEvaluationApp() {
                 qCardTutor.removeEventListener('click', onCardTutorClick);
             if (btnQuestionsBack)
                 btnQuestionsBack.removeEventListener('click', onBackClick);
-            document.removeEventListener('spp:practice', onPracticeChange);
+            unsubPractice();
         };
     }, [cargarLista, resolverPractica, switchView]);
 

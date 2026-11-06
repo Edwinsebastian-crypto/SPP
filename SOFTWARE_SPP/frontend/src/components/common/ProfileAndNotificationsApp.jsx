@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { session, logout, ROLES, request } from '../../core/api';
 
 const POLL_MS = 60000;
 
@@ -35,12 +36,9 @@ export default function ProfileAndNotificationsApp() {
 
     // 1. Session + Profile + Logout binding
     useEffect(() => {
-        const SPP = window.SPP;
-        if (!SPP) return;
-
         const handleLogout = (e) => {
             e.preventDefault();
-            SPP.logout();
+            logout();
         };
 
         const logoutLinks = Array.from(document.querySelectorAll('.app-logout'));
@@ -49,7 +47,7 @@ export default function ProfileAndNotificationsApp() {
         let cancelled = false;
         (async () => {
             try {
-                const user = await SPP.session();
+                const user = await session();
                 if (cancelled || !user) return;
                 const fullName = ((user.firstName || '') + ' ' + (user.lastName || '')).trim();
 
@@ -57,7 +55,7 @@ export default function ProfileAndNotificationsApp() {
                     el.textContent = fullName;
                 });
                 document.querySelectorAll('.app-account small').forEach((el) => {
-                    el.textContent = (SPP.ROLES && SPP.ROLES[user.role]) || user.role;
+                    el.textContent = (ROLES && ROLES[user.role]) || user.role;
                 });
 
                 const capitalize = (text) =>
@@ -76,7 +74,7 @@ export default function ProfileAndNotificationsApp() {
                     else if (label.includes('status')) value.textContent = capitalize(user.status);
                 });
             } catch (_) {
-                // Handled by SPP.session redirect if unauthorized
+                // Handled by session redirect if unauthorized
             }
         })();
 
@@ -124,10 +122,8 @@ export default function ProfileAndNotificationsApp() {
     }, []);
 
     const loadNotifications = useCallback(async () => {
-        const SPP = window.SPP;
-        if (!SPP || !SPP.request) return;
         try {
-            const data = await SPP.request('/api/notifications', { skipRedirect: true });
+            const data = await request('/api/notifications', { skipRedirect: true });
             const list = Array.isArray(data && data.notifications) ? data.notifications : [];
             setItems(list);
             setUnread(Number(data && data.unread) || 0);
@@ -137,10 +133,8 @@ export default function ProfileAndNotificationsApp() {
     }, []);
 
     const markRead = useCallback(async (id) => {
-        const SPP = window.SPP;
-        if (!SPP || !SPP.request) return;
         try {
-            await SPP.request('/api/notifications/read', {
+            await request('/api/notifications/read', {
                 method: 'POST',
                 body: id ? { id } : {},
                 skipRedirect: true

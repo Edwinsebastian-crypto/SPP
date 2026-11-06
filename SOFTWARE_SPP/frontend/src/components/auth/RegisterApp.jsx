@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { get, request } from '../../core/api';
+import { useCustomSelect } from '../../hooks/useCustomSelect';
 
 const ROLES = {
     student: { name: 'Student', icon: 'fa-graduation-cap' },
@@ -21,7 +23,21 @@ function stripAccents(text) {
 }
 
 export default function RegisterApp() {
-    const domain = '@' + (window.SPP_DOMAIN || 'udi.edu.co');
+    const [institutionalDomain, setInstitutionalDomain] = useState(
+        typeof window !== 'undefined' && window.SPP_DOMAIN ? window.SPP_DOMAIN : 'udi.edu.co'
+    );
+
+    useEffect(() => {
+        get('/api/config')
+            .then((cfg) => {
+                if (cfg && cfg.institutionalDomain) {
+                    setInstitutionalDomain(cfg.institutionalDomain);
+                }
+            })
+            .catch(() => {});
+    }, []);
+
+    const domain = '@' + institutionalDomain;
 
     const [currentStep, setCurrentStep] = useState(1);
     const [programs, setPrograms] = useState([]);
@@ -57,7 +73,7 @@ export default function RegisterApp() {
     useEffect(() => {
         async function loadPrograms() {
             try {
-                const res = await window.SPP.request('/api/auth/programs', {
+                const res = await request('/api/auth/programs', {
                     skipRedirect: true,
                 });
                 const list = res.programs || [];
@@ -69,31 +85,10 @@ export default function RegisterApp() {
         loadPrograms();
     }, []);
 
-    useEffect(() => {
-        if (window.SPP?.customSelect?.init) {
-            window.SPP.customSelect.init('#reg-wizard-container');
-            if (docTypeRef.current && window.SPP.customSelect.rebuild) {
-                window.SPP.customSelect.rebuild(docTypeRef.current);
-                window.SPP.customSelect.sync(docTypeRef.current);
-            }
-            if (programRef.current && window.SPP.customSelect.rebuild) {
-                window.SPP.customSelect.rebuild(programRef.current);
-                window.SPP.customSelect.sync(programRef.current);
-            }
-        }
-    }, [programs]);
-
-    useEffect(() => {
-        if (docTypeRef.current && window.SPP?.customSelect?.sync) {
-            window.SPP.customSelect.sync(docTypeRef.current);
-        }
-    }, [documentType]);
-
-    useEffect(() => {
-        if (programRef.current && window.SPP?.customSelect?.sync) {
-            window.SPP.customSelect.sync(programRef.current);
-        }
-    }, [program, role]);
+    useCustomSelect(
+        ['#reg-wizard-container', docTypeRef, programRef],
+        [programs, documentType, program, role, step]
+    );
 
     // Auto-suggest email when firstName or lastName changes
     useEffect(() => {
@@ -283,7 +278,7 @@ export default function RegisterApp() {
 
         setSubmitting(true);
         try {
-            await window.SPP.request('/api/auth/register', {
+            await request('/api/auth/register', {
                 method: 'POST',
                 skipRedirect: true,
                 body: {

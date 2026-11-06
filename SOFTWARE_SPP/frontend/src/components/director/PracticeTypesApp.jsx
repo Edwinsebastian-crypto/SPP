@@ -1,4 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { get, post, put, del, showError } from '../../core/api';
+import { alert as alertModal, confirm as confirmModal } from '../../core/modals';
+import { resetScroll } from '../../core/panels';
+import { useCustomSelect } from '../../hooks/useCustomSelect';
+import { EVENTS, emit, on } from '../../core/events';
 
 export default function PracticeTypesApp() {
     const [activeTab, setActiveTab] = useState('ptm-panel-register');
@@ -18,17 +23,15 @@ export default function PracticeTypesApp() {
     const semesterSelectRef = useRef(null);
 
     const loadTypes = useCallback(async () => {
-        const SPP = window.SPP;
-        if (!SPP) return;
         try {
             const [typeRes, pracRes] = await Promise.all([
-                SPP.get('/api/practice-types'),
-                SPP.get('/api/practices')
+                get('/api/practice-types'),
+                get('/api/practices')
             ]);
             setPracticeTypes(typeRes.practiceTypes || []);
             setAllPractices(pracRes.practices || []);
         } catch (err) {
-            if (SPP.showError) SPP.showError(err);
+            showError(err);
         }
     }, []);
 
@@ -52,22 +55,16 @@ export default function PracticeTypesApp() {
         };
 
         if (navLink) navLink.addEventListener('click', handleNavClick);
-        window.addEventListener('spp:practices-changed', handlePracticesChanged);
+        const unsubPractices = on(EVENTS.PRACTICES_CHANGED, handlePracticesChanged);
 
         return () => {
             if (navLink) navLink.removeEventListener('click', handleNavClick);
-            window.removeEventListener('spp:practices-changed', handlePracticesChanged);
+            unsubPractices();
         };
     }, [loadTypes, resetForm]);
 
     // Sync customSelect for semester select
-    useEffect(() => {
-        const SPP = window.SPP;
-        if (!SPP || !SPP.customSelect || !rootRef.current || !semesterSelectRef.current) return;
-        SPP.customSelect.init(rootRef.current);
-        SPP.customSelect.rebuild(semesterSelectRef.current);
-        SPP.customSelect.sync(semesterSelectRef.current);
-    }, [semester, editingId, activeTab]);
+    useCustomSelect([rootRef, semesterSelectRef], [semester, editingId, activeTab]);
 
     // Close 3-dot card menus on outside click
     useEffect(() => {
@@ -120,41 +117,37 @@ export default function PracticeTypesApp() {
         setErrors(nextErrors);
         if (Object.keys(nextErrors).length > 0) return;
 
-        const SPP = window.SPP;
-        if (!SPP) return;
-
         const isEdit = Boolean(editingId);
         const body = { name, semester, hours };
         try {
             let savedId = editingId;
             if (isEdit) {
-                await SPP.put(`/api/practice-types/${editingId}`, body);
+                await put(`/api/practice-types/${editingId}`, body);
             } else {
-                const res = await SPP.post('/api/practice-types', body);
+                const res = await post('/api/practice-types', body);
                 savedId = res && res.practiceType ? res.practiceType.id : null;
             }
             resetForm();
             await loadTypes();
-            window.dispatchEvent(new CustomEvent('spp:dataChanged'));
+            emit(EVENTS.DATA_CHANGED);
             if (window.SPP_REPORTS && window.SPP_REPORTS.reload) {
                 window.SPP_REPORTS.reload();
             }
             revealCard(savedId);
-            await SPP.modals.alert({
+            await alertModal({
                 title: isEdit ? 'Practice type updated' : 'Practice type created',
                 message: isEdit
                     ? 'The changes were saved and the practice type now appears in the list.'
                     : 'The practice type was registered successfully and already appears in the list.'
             });
         } catch (err) {
-            if (SPP.showError) SPP.showError(err);
+            showError(err);
         }
     };
 
     const handleView = (type) => {
         setOpenMenuId(null);
-        if (!window.SPP || !window.SPP.modals) return;
-        window.SPP.modals.alert({
+        alertModal({
             title: type.name,
             icon: 'info',
             rows: [
@@ -173,36 +166,30 @@ export default function PracticeTypesApp() {
         setHours(String(type.hours || ''));
         setErrors({});
         setActiveTab('ptm-panel-register');
-        if (window.SPP && window.SPP.panels && window.SPP.panels.resetScroll) {
-            window.SPP.panels.resetScroll();
-        } else {
-            window.scrollTo(0, 0);
-        }
+        resetScroll();
     };
 
     const handleDelete = async (type) => {
         setOpenMenuId(null);
-        const SPP = window.SPP;
-        if (!SPP || !SPP.modals) return;
-        const confirmed = await SPP.modals.confirm({
+        const confirmed = await confirmModal({
             title: 'Delete practice type',
             message: `The practice type "${type.name}" will be permanently deleted.\n\nThis action cannot be undone.`,
             confirmLabel: 'Delete'
         });
         if (!confirmed) return;
         try {
-            await SPP.del(`/api/practice-types/${type.id}`);
+            await del(`/api/practice-types/${type.id}`);
             await loadTypes();
-            window.dispatchEvent(new CustomEvent('spp:dataChanged'));
+            emit(EVENTS.DATA_CHANGED);
             if (window.SPP_REPORTS && window.SPP_REPORTS.reload) {
                 window.SPP_REPORTS.reload();
             }
-            await SPP.modals.alert({
+            await alertModal({
                 title: 'Practice type deleted',
                 message: 'The practice type was deleted successfully.'
             });
         } catch (err) {
-            if (SPP.showError) SPP.showError(err);
+            showError(err);
         }
     };
 

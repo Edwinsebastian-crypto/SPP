@@ -1,7 +1,6 @@
 /* =========================================================================
    export.js — File exports of the Reports panel (no external libraries: the CSP only allows our own scripts).
    ========================================================================= */
-const SPP = (typeof window !== 'undefined' && (window.SPP || (window.SPP = {}))) || {};
 
 const encoder = new TextEncoder();
 const bytes = (text) => encoder.encode(text);
@@ -202,6 +201,5 @@ export function download(name, blob) {
     setTimeout(() => { link.remove(); URL.revokeObjectURL(url); }, 1500);
 }
 
-const exporter = { xlsx, csv, zip, download, fileName, matrix, slug, crc32, today };
-SPP.exporter = exporter;
+export const exporter = { xlsx, csv, zip, download, fileName, matrix, slug, crc32, today };
 export default exporter;

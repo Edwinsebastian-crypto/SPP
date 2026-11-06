@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { get, post, showError } from '../../core/api';
+import { openExport as openExportKit } from '../../core/reports-kit';
 import {
     fmt,
     pct,
@@ -621,10 +623,9 @@ export default function AccreditationApp() {
         setFailure('');
         setNotice('');
         try {
-            const SPP = window.SPP;
             const [repRes, typesRes] = await Promise.all([
-                SPP.get(`/api/reports?year=${encodeURIComponent(y)}`),
-                SPP.get('/api/practice-types').catch(() => null),
+                get(`/api/reports?year=${encodeURIComponent(y)}`),
+                get('/api/practice-types').catch(() => null),
             ]);
             const list = repRes.indicators || [];
             if (typesRes && typesRes.practiceTypes) {
@@ -653,10 +654,9 @@ export default function AccreditationApp() {
         setFailure('');
         setNotice('');
         try {
-            const SPP = window.SPP;
             const [result, typesRes] = await Promise.all([
-                SPP.post('/api/reports/generate', { year }),
-                SPP.get('/api/practice-types').catch(() => null),
+                post('/api/reports/generate', { year }),
+                get('/api/practice-types').catch(() => null),
             ]);
             const list = result.indicators || [];
             if (typesRes && typesRes.practiceTypes) {
@@ -674,7 +674,7 @@ export default function AccreditationApp() {
                 window.SPP_REPORTS.reload();
             }
         } catch (err) {
-            if (window.SPP?.showError) window.SPP.showError(err);
+            showError(err);
         } finally {
             setBusy(false);
         }
@@ -682,9 +682,7 @@ export default function AccreditationApp() {
 
     const openExport = () => {
         if (!indicators.length) return;
-        const K = window.SPP?.reportKit;
-        if (!K || !K.openExport) return;
-        K.openExport({
+        openExportKit({
             title: `Export accreditation data · ${year}`,
             subtitle:
                 'Choose the programs and the information to include. Excel gives one sheet per item.',

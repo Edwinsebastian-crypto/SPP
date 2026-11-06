@@ -1,3 +1,10 @@
+import {
+    toast as uiToast,
+    error as uiError,
+    confirmar as uiConfirmar,
+    habilitarEnlacesExternos as uiHabilitar
+} from '../core/ui';
+
 export const ESTADOS = {
     BORRADOR: ['Draft', 'fa-regular fa-pen-to-square'],
     PUBLICADA: ['Published', 'fa-solid fa-circle-check'],
@@ -17,7 +24,6 @@ export const TIPOS = {
 };
 
 export function fecha(iso) {
-    if (window.EvalUI?.fecha) return window.EvalUI.fecha(iso);
     if (!iso) return '—';
     const d = new Date(iso);
     if (isNaN(d)) return '—';
@@ -29,38 +35,27 @@ export function fecha(iso) {
 }
 
 export function nota(n) {
-    if (window.EvalUI?.nota) return window.EvalUI.nota(n);
     return n === null || n === undefined ? '—' : Number(n).toFixed(2);
 }
 
 export function plural(n, uno, varios) {
-    if (window.EvalUI?.plural) return window.EvalUI.plural(n, uno, varios);
     return `${n} ${n === 1 ? uno : varios}`;
 }
 
 export function toast(mensaje, tipo) {
-    if (window.EvalUI?.toast) {
-        window.EvalUI.toast(mensaje, tipo);
-    }
+    uiToast(mensaje, tipo);
 }
 
 export function mostrarError(e) {
-    if (window.EvalUI?.error) {
-        window.EvalUI.error(e);
-    } else {
-        toast((e && e.message) || 'An unexpected error occurred.', 'error');
-    }
+    uiError(e);
 }
 
 export function confirmar(opts) {
-    if (window.EvalUI?.confirmar) {
-        return window.EvalUI.confirmar(opts);
-    }
-    return Promise.resolve(window.confirm(opts.mensaje || 'Confirm?'));
+    return uiConfirmar(opts);
 }
 
 export function habilitarEnlacesExternos() {
-    window.EvalUI?.habilitarEnlacesExternos?.();
+    uiHabilitar();
 }
 
 export function scrollTopAll() {

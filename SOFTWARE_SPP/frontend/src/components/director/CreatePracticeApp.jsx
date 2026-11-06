@@ -1,5 +1,10 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import CustomDateTimePicker from '../common/CustomDateTimePicker';
+import { get, post, put, showError } from '../../core/api';
+import { alert as alertModal } from '../../core/modals';
+import { resetScroll } from '../../core/panels';
+import { useCustomSelect } from '../../hooks/useCustomSelect';
+import { EVENTS, emit, on } from '../../core/events';
 
 export default function CreatePracticeApp() {
     const [practiceTypes, setPracticeTypes] = useState([]);
@@ -28,14 +33,12 @@ export default function CreatePracticeApp() {
     const isNavigatingToEditRef = useRef(false);
 
     const loadOptions = useCallback(async () => {
-        const SPP = window.SPP;
-        if (!SPP) return;
         try {
             const [typesRes, instRes, usersRes, pracRes] = await Promise.all([
-                SPP.get('/api/practice-types'),
-                SPP.get('/api/institutions'),
-                SPP.get('/api/users?status=active'),
-                SPP.get('/api/practices')
+                get('/api/practice-types'),
+                get('/api/institutions'),
+                get('/api/users?status=active'),
+                get('/api/practices')
             ]);
             setPracticeTypes(typesRes.practiceTypes || []);
             setInstitutions(instRes.institutions || []);
@@ -43,7 +46,7 @@ export default function CreatePracticeApp() {
             setActiveUsers(users);
             setAllPractices(pracRes.practices || []);
         } catch (err) {
-            if (SPP.showError) SPP.showError(err);
+            showError(err);
         }
     }, []);
 
@@ -61,34 +64,28 @@ export default function CreatePracticeApp() {
     }, [loadOptions]);
 
     // Sync customSelect whenever options, values, or editingId change
-    useEffect(() => {
-        const SPP = window.SPP;
-        if (!SPP || !SPP.customSelect || !rootRef.current) return;
-        SPP.customSelect.init(rootRef.current);
+    useCustomSelect(
         [
-            typeSelectRef.current,
-            instSelectRef.current,
-            studentSelectRef.current,
-            tutorSelectRef.current,
-            advisorSelectRef.current
-        ].forEach((sel) => {
-            if (sel) {
-                SPP.customSelect.rebuild(sel);
-                SPP.customSelect.sync(sel);
-            }
-        });
-    }, [
-        practiceTypes,
-        institutions,
-        activeUsers,
-        allPractices,
-        editingId,
-        typeId,
-        institutionId,
-        studentDoc,
-        tutorDoc,
-        advisorDoc
-    ]);
+            rootRef,
+            typeSelectRef,
+            instSelectRef,
+            studentSelectRef,
+            tutorSelectRef,
+            advisorSelectRef
+        ],
+        [
+            practiceTypes,
+            institutions,
+            activeUsers,
+            allPractices,
+            editingId,
+            typeId,
+            institutionId,
+            studentDoc,
+            tutorDoc,
+            advisorDoc
+        ]
+    );
 
     useEffect(() => {
         loadOptions();
@@ -117,11 +114,7 @@ export default function CreatePracticeApp() {
                 createPracticeTab.click();
                 isNavigatingToEditRef.current = false;
             }
-            if (window.SPP && window.SPP.panels && window.SPP.panels.resetScroll) {
-                window.SPP.panels.resetScroll();
-            } else {
-                window.scrollTo(0, 0);
-            }
+            resetScroll();
         };
 
         const navLink = document.querySelector('a[href="#create-practice"]');
@@ -131,13 +124,13 @@ export default function CreatePracticeApp() {
             }
         };
 
-        window.addEventListener('spp:dataChanged', handleDataChanged);
-        window.addEventListener('spp:edit-practice', handleEditPractice);
+        const unsubData = on(EVENTS.DATA_CHANGED, handleDataChanged);
+        const unsubEdit = on(EVENTS.EDIT_PRACTICE, (detail) => handleEditPractice({ detail }));
         if (navLink) navLink.addEventListener('click', handleNavClick);
 
         return () => {
-            window.removeEventListener('spp:dataChanged', handleDataChanged);
-            window.removeEventListener('spp:edit-practice', handleEditPractice);
+            unsubData();
+            unsubEdit();
             if (navLink) navLink.removeEventListener('click', handleNavClick);
         };
     }, [loadOptions, resetForm]);
@@ -189,9 +182,6 @@ export default function CreatePracticeApp() {
         setErrors(nextErrors);
         if (Object.keys(nextErrors).length > 0) return;
 
-        const SPP = window.SPP;
-        if (!SPP) return;
-
         setSaving(true);
         try {
             const payload = {
@@ -206,17 +196,15 @@ export default function CreatePracticeApp() {
             const isEdit = Boolean(editingId);
             let savedId = editingId;
             if (isEdit) {
-                await SPP.put(`/api/practices/${editingId}`, payload);
+                await put(`/api/practices/${editingId}`, payload);
             } else {
-                const created = await SPP.post('/api/practices', payload);
+                const created = await post('/api/practices', payload);
                 savedId = created && created.practice ? created.practice.id : null;
             }
 
-            window.dispatchEvent(
-                new CustomEvent('spp:practices-changed', { detail: { id: savedId } })
-            );
-            window.dispatchEvent(new CustomEvent('spp:dataChanged'));
-            window.dispatchEvent(new CustomEvent('spp:home-refresh'));
+            emit(EVENTS.PRACTICES_CHANGED, { id: savedId });
+            emit(EVENTS.DATA_CHANGED);
+            emit(EVENTS.HOME_REFRESH);
             if (window.SPP_REPORTS && window.SPP_REPORTS.reload) {
                 window.SPP_REPORTS.reload();
             }
@@ -225,16 +213,16 @@ export default function CreatePracticeApp() {
             const msg = isEdit
                 ? 'The practice was updated successfully and already appears in the list.'
                 : 'The practice was registered successfully and already appears in the list.';
-            await SPP.modals.alert({ title, message: msg });
+            await alertModal({ title, message: msg });
 
             resetForm();
             if (savedId) {
                 const practiceTab = document.querySelector('a[href="#practice"]');
                 if (practiceTab) practiceTab.click();
-                if (SPP.panels && SPP.panels.resetScroll) SPP.panels.resetScroll();
+                resetScroll();
             }
         } catch (err) {
-            if (SPP.showError) SPP.showError(err);
+            showError(err);
         } finally {
             setSaving(false);
         }

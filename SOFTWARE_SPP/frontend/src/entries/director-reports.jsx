@@ -1,7 +1,7 @@
 import '../core/api.js';
 import '../core/shell.js';
-import '../core/custom-select.js';
-import '../core/panels.js';
+import { init as initCustomSelect } from '../core/custom-select.js';
+import { wireTabs } from '../core/panels.js';
 import '../core/modals.js';
 import '../core/ui.js';
 import '../core/export.js';
@@ -18,11 +18,10 @@ import AccreditationApp from '../components/reports/AccreditationApp';
 import ReportsDashboardApp from '../components/reports/ReportsDashboardApp';
 import { mountActivities } from './activities-mount';
 import { mountPanelCommon } from './panel-common-mount';
+import { habilitarEnlacesExternos } from '../utils/evalBridge';
 
 function wireDirectorReportsTabs() {
-    if (window.EvalUI && typeof window.EvalUI.habilitarEnlacesExternos === 'function') {
-        window.EvalUI.habilitarEnlacesExternos();
-    }
+    habilitarEnlacesExternos();
 
     const reportButtons = Array.from(document.querySelectorAll('#reports .reports-tab-btn'));
     const reportPanelIds = [
@@ -35,13 +34,11 @@ function wireDirectorReportsTabs() {
     ];
     const reportPanels = reportPanelIds.map((id) => document.getElementById(id)).filter(Boolean);
 
-    if (window.SPP && window.SPP.panels && typeof window.SPP.panels.wireTabs === 'function') {
-        window.SPP.panels.wireTabs(
-            reportButtons,
-            reportPanels,
-            (_button, index) => reportPanelIds[index]
-        );
-    }
+    wireTabs(
+        reportButtons,
+        reportPanels,
+        (_button, index) => reportPanelIds[index]
+    );
 
     const btnEvalTab = document.getElementById('btn-evaluations-tab');
     if (btnEvalTab) {
@@ -53,12 +50,8 @@ function wireDirectorReportsTabs() {
                 const cont = document.getElementById('panel-contenido');
                 if (cont && (cont.children.length === 0 || cont.querySelector('.ev-loading'))) {
                     window.SPP_DIRECTOR.cargarEvaluaciones();
-                } else if (
-                    window.SPP &&
-                    window.SPP.customSelect &&
-                    typeof window.SPP.customSelect.init === 'function'
-                ) {
-                    window.SPP.customSelect.init('#dv-lista');
+                } else {
+                    initCustomSelect('#dv-lista');
                 }
             }
         });

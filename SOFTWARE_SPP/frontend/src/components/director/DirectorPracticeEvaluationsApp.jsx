@@ -7,6 +7,7 @@ import {
     getEvalAPI,
 } from '../../utils/evalBridge';
 import { Icon, Badge, BadgeOrigen, BusyButton } from '../common/Badge';
+import { EVENTS, on } from '../../core/events';
 
 function resolveActivePractice() {
     let p = null;
@@ -286,10 +287,7 @@ export default function DirectorPracticeEvaluationsApp() {
                 }
             }
         };
-        window.addEventListener(
-            'spp:director-practice-changed',
-            onPracticeChanged
-        );
+        const unsubPractice = on(EVENTS.DIRECTOR_PRACTICE_CHANGED, onPracticeChanged);
 
         const qBtn = document.getElementById('questions-btn');
         const qCard = document.getElementById('lb-card-questions');
@@ -317,10 +315,7 @@ export default function DirectorPracticeEvaluationsApp() {
         };
 
         return () => {
-            window.removeEventListener(
-                'spp:director-practice-changed',
-                onPracticeChanged
-            );
+            unsubPractice();
             if (qBtn) qBtn.removeEventListener('click', onQBtnClick);
             if (qCard) qCard.removeEventListener('click', onQCardClick);
             if (qBack) qBack.removeEventListener('click', onQBackClick);

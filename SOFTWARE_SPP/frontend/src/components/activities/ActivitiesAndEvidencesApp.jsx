@@ -1,6 +1,20 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
+    get,
+    post,
+    patch,
+    del,
+    request,
+    session,
+    showError,
+    formatDateTime,
+    formatActivityDate
+} from '../../core/api';
+import { resetScroll as panelResetScroll, showPanel } from '../../core/panels';
+import { scrollAppShellToReveal } from '../../core/shell';
+import { EVENTS, on } from '../../core/events';
+import {
     fileIcon,
     StudentEvidenceModal,
     TutorActivityModal,
@@ -11,10 +25,7 @@ import {
 } from './ActivitiesModals';
 
 function resetScroll() {
-    if (window.SPP?.panels?.resetScroll) {
-        window.SPP.panels.resetScroll();
-        return;
-    }
+    panelResetScroll();
     window.scrollTo(0, 0);
     const appShell = document.querySelector('.app-shell');
     if (appShell) appShell.scrollTop = 0;
@@ -299,11 +310,9 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                 existing.remove();
             }
         });
-        if (window.SPP?.session) {
-            window.SPP.session()
-                .then((u) => setCurrentUser(u))
-                .catch(() => {});
-        }
+        session()
+            .then((u) => setCurrentUser(u))
+            .catch(() => {});
     }, []);
 
     const updateLogbookBadges = useCallback(
@@ -400,14 +409,13 @@ export default function ActivitiesAndEvidencesApp({ role }) {
             if (String(loadedPracticeIdRef.current) !== String(p.id)) {
                 setLoadingActivities(true);
             }
-            const SPP = window.SPP;
             let list = [];
             try {
-                const data = await SPP.get(`/api/practices/${p.id}/activities`);
+                const data = await get(`/api/practices/${p.id}/activities`);
                 list = data.activities || [];
             } catch (err) {
                 setLoadingActivities(false);
-                if (SPP?.showError) SPP.showError(err);
+                showError(err);
                 return;
             }
 
@@ -457,11 +465,10 @@ export default function ActivitiesAndEvidencesApp({ role }) {
         if (showSkeleton) {
             setLoadingDetail(true);
         }
-        const SPP = window.SPP;
         try {
             const [evRes, fbRes] = await Promise.all([
-                SPP.get(`/api/activities/${target.id}/evidences`),
-                SPP.get(`/api/activities/${target.id}/feedback`),
+                get(`/api/activities/${target.id}/evidences`),
+                get(`/api/activities/${target.id}/feedback`),
             ]);
             const evList = evRes.evidences || [];
             const fbList = fbRes.feedback || [];
@@ -471,7 +478,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                 window.SPP_TEACHER.state.evidences = evList;
             }
         } catch (err) {
-            if (SPP?.showError) SPP.showError(err);
+            showError(err);
         } finally {
             setLoadingDetail(false);
         }
@@ -484,21 +491,15 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                 setPractice(window.SPP_STUDENT_PRACTICE);
                 loadActivities(window.SPP_STUDENT_PRACTICE);
             }
-            const onStudentPractice = (e) => {
-                const p = e.detail?.practice || e.detail;
+            return on(EVENTS.STUDENT_PRACTICE, (detail) => {
+                const p = detail?.practice || detail;
                 if (p) {
                     setPractice(p);
                     setActiveFilter('all');
                     setSearchQuery('');
                     loadActivities(p);
                 }
-            };
-            window.addEventListener('spp:student-practice', onStudentPractice);
-            return () =>
-                window.removeEventListener(
-                    'spp:student-practice',
-                    onStudentPractice
-                );
+            });
         }
 
         if (role === 'tutor' || role === 'advisor') {
@@ -519,18 +520,15 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                 loadActivities(window.SPP_TEACHER.state.practice);
             }
 
-            const onTeacherPractice = (e) => {
-                const p = e.detail;
+            const unsubTeacher = on(EVENTS.PRACTICE, (p) => {
                 if (p) {
                     setPractice(p);
                     setActiveFilter('all');
                     setSearchQuery('');
                     loadActivities(p);
                 }
-            };
-            document.addEventListener('spp:practice', onTeacherPractice);
-            return () =>
-                document.removeEventListener('spp:practice', onTeacherPractice);
+            }, document);
+            return unsubTeacher;
         }
 
         if (role === 'director') {
@@ -541,63 +539,19 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                 setPractice(initial);
                 loadActivities(initial);
             }
-            const onDirectorPractice = (e) => {
-                const p = e.detail?.practice;
+            return on(EVENTS.DIRECTOR_PRACTICE_CHANGED, (detail) => {
+                const p = detail?.practice;
                 if (p) {
                     setPractice(p);
                     setActiveFilter('all');
                     setSearchQuery('');
                     loadActivities(p);
                 }
-            };
-            window.addEventListener(
-                'spp:director-practice-changed',
-                onDirectorPractice
-            );
-            return () =>
-                window.removeEventListener(
-                    'spp:director-practice-changed',
-                    onDirectorPractice
-                );
+            });
         }
     }, [role, loadActivities, loadEvidenceAndFeedback]);
 
-    // Also expose SPP.evidenceModal for backwards compatibility on Student
-    useEffect(() => {
-        if (role === 'student' && window.SPP) {
-            window.SPP.evidenceModal = {
-                open: (mode = 'add') =>
-                    setStudentModalState({
-                        open: true,
-                        mode,
-                        evidence: null,
-                        busy: false,
-                    }),
-                openForEdit: (ev) =>
-                    setStudentModalState({
-                        open: true,
-                        mode: 'edit',
-                        evidence: ev,
-                        busy: false,
-                    }),
-                openForView: (ev) =>
-                    setStudentModalState({
-                        open: true,
-                        mode: 'view',
-                        evidence: ev,
-                        busy: false,
-                    }),
-                close: () =>
-                    setStudentModalState((prev) => ({
-                        ...prev,
-                        open: false,
-                        busy: false,
-                    })),
-                setBusy: (busy) =>
-                    setStudentModalState((prev) => ({ ...prev, busy })),
-            };
-        }
-    }, [role]);
+
 
     const handleOpenActivity = (activity) => {
         setCurrentActivity(activity);
@@ -610,18 +564,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
             window.SPP_TEACHER.state.activity = activity;
         }
         loadEvidenceAndFeedback(activity, true);
-
-        const actPanel = document.getElementById('activities-panel');
-        const evPanel = document.getElementById('evidences-panel');
-        const practicePanel = document.querySelector('#practice .practice-panel');
-        const logbookPanel = document.getElementById('logbook-panel');
-        if (practicePanel) practicePanel.style.display = 'none';
-        if (logbookPanel) logbookPanel.style.display = 'none';
-        if (actPanel && evPanel) {
-            actPanel.style.display = 'none';
-            evPanel.style.display = role === 'student' ? 'block' : 'flex';
-            resetScroll();
-        }
+        showPanel('evidences-panel', role === 'student' ? 'block' : 'flex');
     };
 
     useEffect(() => {
@@ -637,7 +580,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                     window.SPP_TEACHER?.state?.practice?.id;
                 if (targetPracticeId) {
                     try {
-                        const data = await window.SPP.get(
+                        const data = await get(
                             `/api/practices/${targetPracticeId}/activities`
                         );
                         const list = data.activities || [];
@@ -674,17 +617,12 @@ export default function ActivitiesAndEvidencesApp({ role }) {
             }
         };
 
-        window.addEventListener('spp:open-activity', onOpenActivityEvent);
-        return () =>
-            window.removeEventListener('spp:open-activity', onOpenActivityEvent);
+        return on(EVENTS.OPEN_ACTIVITY, onOpenActivityEvent);
     }, [role, activities, handleOpenActivity]);
 
     useEffect(() => {
         const onOpenUploadEvidenceEvent = () => {
-            const evPanel = document.getElementById('evidences-panel');
-            const actPanel = document.getElementById('activities-panel');
-            if (evPanel) evPanel.style.display = 'none';
-            if (actPanel) actPanel.style.display = 'flex';
+            showPanel('activities-panel', 'flex');
             if (!practice && window.SPP_STUDENT_PRACTICE) {
                 setPractice(window.SPP_STUDENT_PRACTICE);
                 loadActivities(window.SPP_STUDENT_PRACTICE);
@@ -695,35 +633,17 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                 evidence: null,
                 busy: false,
             });
-            resetScroll();
         };
 
-        window.addEventListener('spp:open-upload-evidence', onOpenUploadEvidenceEvent);
-        return () =>
-            window.removeEventListener(
-                'spp:open-upload-evidence',
-                onOpenUploadEvidenceEvent
-            );
+        return on(EVENTS.OPEN_UPLOAD_EVIDENCE, onOpenUploadEvidenceEvent);
     }, [practice, loadActivities]);
 
     const handleBackToLogbook = () => {
-        const actPanel = document.getElementById('activities-panel');
-        const logbookPanel = document.getElementById('logbook-panel');
-        if (actPanel && logbookPanel) {
-            actPanel.style.display = 'none';
-            logbookPanel.style.display = 'flex';
-            resetScroll();
-        }
+        showPanel('logbook-panel', 'flex');
     };
 
     const handleBackToActivities = () => {
-        const evPanel = document.getElementById('evidences-panel');
-        const actPanel = document.getElementById('activities-panel');
-        if (evPanel && actPanel) {
-            evPanel.style.display = 'none';
-            actPanel.style.display = 'flex';
-            resetScroll();
-        }
+        showPanel('activities-panel', 'flex');
         loadActivities();
     };
 
@@ -738,7 +658,6 @@ export default function ActivitiesAndEvidencesApp({ role }) {
         description,
     }) => {
         if (!practice) return;
-        const SPP = window.SPP;
         setStudentModalState((prev) => ({ ...prev, busy: true }));
         try {
             const form = new FormData();
@@ -765,7 +684,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                 )}:${pad(now.getSeconds())}`;
                 const currentP = practice || window.SPP_STUDENT_PRACTICE;
                 if (!currentP) throw new Error('Practice not found');
-                const createRes = await SPP.request(
+                const createRes = await request(
                     `/api/practices/${currentP.id}/activities`,
                     {
                         method: 'POST',
@@ -773,7 +692,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                     }
                 );
                 const newActivityId = createRes.activity.id;
-                await SPP.request(`/api/activities/${newActivityId}/evidences`, {
+                await request(`/api/activities/${newActivityId}/evidences`, {
                     method: 'POST',
                     formData: form,
                 });
@@ -783,7 +702,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                 if (isActivityClosed(currentActivity)) {
                     throw new Error('Submissions are closed for this activity');
                 }
-                await SPP.request(
+                await request(
                     `/api/activities/${currentActivity.id}/evidences`,
                     { method: 'POST', formData: form }
                 );
@@ -793,7 +712,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                 if (isActivityClosed(currentActivity)) {
                     throw new Error('Submissions are closed for this activity');
                 }
-                await SPP.request(`/api/evidences/${encodeURIComponent(id)}`, {
+                await request(`/api/evidences/${encodeURIComponent(id)}`, {
                     method: 'PUT',
                     formData: form,
                 });
@@ -813,7 +732,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
             });
         } catch (err) {
             setStudentModalState((prev) => ({ ...prev, busy: false }));
-            if (SPP?.showError) SPP.showError(err);
+            showError(err);
         }
     };
 
@@ -828,7 +747,6 @@ export default function ActivitiesAndEvidencesApp({ role }) {
         keptFileIds,
     }) => {
         if (!practice) return;
-        const SPP = window.SPP;
         setTutorModalState((prev) => ({ ...prev, busy: true }));
         try {
             const formData = new FormData();
@@ -840,7 +758,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
             formData.append('keptFileIds', JSON.stringify(keptFileIds));
 
             if (mode === 'edit' && currentActivity) {
-                await SPP.request(
+                await request(
                     `/api/practices/${practice.id}/activities/${currentActivity.id}`,
                     { method: 'PATCH', formData }
                 );
@@ -856,7 +774,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                 });
                 await loadActivities(currentActivity.id);
             } else {
-                const res = await SPP.request(
+                const res = await request(
                     `/api/practices/${practice.id}/activities`,
                     { method: 'POST', formData }
                 );
@@ -874,7 +792,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
             }
         } catch (err) {
             setTutorModalState((prev) => ({ ...prev, busy: false }));
-            if (SPP?.showError) SPP.showError(err);
+            showError(err);
         }
     };
 
@@ -882,11 +800,10 @@ export default function ActivitiesAndEvidencesApp({ role }) {
     const handleSaveActivityGrade = async (e) => {
         e.stopPropagation();
         if (!currentActivity || !practice) return;
-        const SPP = window.SPP;
         const nuevaNota = gradeInputVal.trim();
         try {
             const numericGrade = nuevaNota ? Number(nuevaNota) : null;
-            await SPP.patch(
+            await patch(
                 `/api/practices/${practice.id}/activities/${currentActivity.id}`,
                 { grade: numericGrade }
             );
@@ -900,7 +817,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                 message: 'Activity grade updated successfully!',
             });
         } catch (err) {
-            if (SPP?.showError) SPP.showError(err);
+            showError(err);
         }
     };
 
@@ -912,7 +829,6 @@ export default function ActivitiesAndEvidencesApp({ role }) {
             alert('Please enter a comment before sending.');
             return;
         }
-        const SPP = window.SPP;
         setSubmittingFeedback(true);
         try {
             const now = new Date();
@@ -924,7 +840,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
             )}:${pad(now.getSeconds())}`;
 
             if (editingFeedbackId) {
-                await SPP.patch(
+                await patch(
                     `/api/activities/${currentActivity.id}/feedback/${editingFeedbackId}`,
                     { text, date: localDate }
                 );
@@ -942,7 +858,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                     setSubmittingFeedback(false);
                     return;
                 }
-                await SPP.post(
+                await post(
                     `/api/activities/${currentActivity.id}/feedback`,
                     { text, evidenceId: firstEvidenceId, date: localDate }
                 );
@@ -959,7 +875,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
             await loadEvidenceAndFeedback(currentActivity);
             await loadActivities(currentActivity.id);
         } catch (err) {
-            if (SPP?.showError) SPP.showError(err);
+            showError(err);
         } finally {
             setSubmittingFeedback(false);
         }
@@ -1021,13 +937,13 @@ export default function ActivitiesAndEvidencesApp({ role }) {
             : `Activity #${currentActivity.number}`
         : 'Activity';
     const assignedDateFormatted = currentActivity
-        ? window.SPP?.formatActivityDate?.(
+        ? formatActivityDate(
               currentActivity.assignedDate || currentActivity.createdAt
           ) || '-'
         : '-';
     const deadlineFormatted = currentActivity
         ? currentActivity.dueDate || currentActivity.deadline
-            ? window.SPP?.formatActivityDate?.(
+            ? formatActivityDate(
                   currentActivity.dueDate || currentActivity.deadline
               )
             : 'without limit'
@@ -1555,7 +1471,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                                                               return;
                                                           setDeleteBusy(true);
                                                           try {
-                                                              await window.SPP.del(
+                                                              await del(
                                                                   `/api/practices/${
                                                                       currentActivity.practiceId ||
                                                                       practice?.id
@@ -1568,13 +1484,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                                                               );
                                                               handleBackToActivities();
                                                           } catch (err) {
-                                                              if (
-                                                                  window.SPP
-                                                                      ?.showError
-                                                              )
-                                                                  window.SPP.showError(
-                                                                      err
-                                                                  );
+                                                              showError(err);
                                                           } finally {
                                                               setDeleteBusy(
                                                                   false
@@ -2099,7 +2009,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                                                                               true
                                                                           );
                                                                           try {
-                                                                              await window.SPP.del(
+                                                                              await del(
                                                                                   `/api/evidences/${encodeURIComponent(
                                                                                       ev.id
                                                                                   )}`
@@ -2114,14 +2024,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                                                                                   currentActivity?.id
                                                                               );
                                                                           } catch (err) {
-                                                                              if (
-                                                                                  window
-                                                                                      .SPP
-                                                                                      ?.showError
-                                                                              )
-                                                                                  window.SPP.showError(
-                                                                                      err
-                                                                                  );
+                                                                              showError(err);
                                                                           } finally {
                                                                               setDeleteBusy(
                                                                                   false
@@ -2200,9 +2103,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                                                               : 'Tutor'}
                                                       </span>
                                                       <span className="feedback-date">
-                                                          {window.SPP?.formatDateTime?.(
-                                                              fb.date
-                                                          ) || fb.date}
+                                                          {formatDateTime(fb.date) || fb.date}
                                                       </span>
                                                   </div>
                                                   <p className="feedback-content">
@@ -2272,7 +2173,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                                                                                   true
                                                                               );
                                                                               try {
-                                                                                  await window.SPP.del(
+                                                                                  await del(
                                                                                       `/api/activities/${currentActivity.id}/feedback/${fb.id}`
                                                                                   );
                                                                                   setConfirmDeleteConfig(
@@ -2285,14 +2186,8 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                                                                                       currentActivity.id
                                                                                   );
                                                                               } catch (err) {
-                                                                                  if (
-                                                                                      window
-                                                                                          .SPP
-                                                                                          ?.showError
-                                                                                  )
-                                                                                      window.SPP.showError(
-                                                                                          err
-                                                                                      );
+                                                                                  showError(err);
+                                                                              
                                                                               } finally {
                                                                                   setDeleteBusy(
                                                                                       false
@@ -2333,14 +2228,10 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                                                       el.scrollHeight,
                                                       200
                                                   )}px`;
-                                                  if (
-                                                      typeof window.scrollAppShellToReveal ===
-                                                          'function' &&
-                                                      feedbackCancelRef.current
-                                                  ) {
+                                                  if (feedbackCancelRef.current) {
                                                       requestAnimationFrame(
                                                           () =>
-                                                              window.scrollAppShellToReveal(
+                                                              scrollAppShellToReveal(
                                                                   feedbackCancelRef.current
                                                               )
                                                       );
