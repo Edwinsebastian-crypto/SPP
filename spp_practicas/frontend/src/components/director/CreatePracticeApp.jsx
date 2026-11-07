@@ -3,8 +3,10 @@ import CustomDateTimePicker from '../common/CustomDateTimePicker';
 import { get, post, put, showError } from '../../core/api';
 import { alert as alertModal } from '../../core/modals';
 import { resetScroll } from '../../core/panels';
+import { activateNav, onNavClick } from '../../core/shell';
 import { useCustomSelect } from '../../hooks/useCustomSelect';
 import { EVENTS, emit, on } from '../../core/events';
+import { inject } from '../../core/registry';
 
 export default function CreatePracticeApp() {
     const [practiceTypes, setPracticeTypes] = useState([]);
@@ -108,16 +110,12 @@ export default function CreatePracticeApp() {
             setEndDate(practice.endDate ? String(practice.endDate).split('T')[0] : '');
             setErrors({});
 
-            const createPracticeTab = document.querySelector('a[href="#create-practice"]');
-            if (createPracticeTab) {
-                isNavigatingToEditRef.current = true;
-                createPracticeTab.click();
-                isNavigatingToEditRef.current = false;
-            }
+            isNavigatingToEditRef.current = true;
+            activateNav('#create-practice');
+            isNavigatingToEditRef.current = false;
             resetScroll();
         };
 
-        const navLink = document.querySelector('a[href="#create-practice"]');
         const handleNavClick = () => {
             if (!isNavigatingToEditRef.current) {
                 resetForm();
@@ -126,12 +124,12 @@ export default function CreatePracticeApp() {
 
         const unsubData = on(EVENTS.DATA_CHANGED, handleDataChanged);
         const unsubEdit = on(EVENTS.EDIT_PRACTICE, (detail) => handleEditPractice({ detail }));
-        if (navLink) navLink.addEventListener('click', handleNavClick);
+        const unsubNav = onNavClick('#create-practice', handleNavClick);
 
         return () => {
             unsubData();
             unsubEdit();
-            if (navLink) navLink.removeEventListener('click', handleNavClick);
+            unsubNav();
         };
     }, [loadOptions, resetForm]);
 
@@ -205,9 +203,7 @@ export default function CreatePracticeApp() {
             emit(EVENTS.PRACTICES_CHANGED, { id: savedId });
             emit(EVENTS.DATA_CHANGED);
             emit(EVENTS.HOME_REFRESH);
-            if (window.SPP_REPORTS && window.SPP_REPORTS.reload) {
-                window.SPP_REPORTS.reload();
-            }
+            inject('reports')?.reload?.();
 
             const title = isEdit ? 'Practice updated' : 'Practice created';
             const msg = isEdit
@@ -217,8 +213,7 @@ export default function CreatePracticeApp() {
 
             resetForm();
             if (savedId) {
-                const practiceTab = document.querySelector('a[href="#practice"]');
-                if (practiceTab) practiceTab.click();
+                activateNav('#practice');
                 resetScroll();
             }
         } catch (err) {

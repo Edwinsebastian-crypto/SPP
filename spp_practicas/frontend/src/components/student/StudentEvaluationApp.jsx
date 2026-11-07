@@ -14,10 +14,10 @@ import {
 import { Icon, Badge, BusyButton } from '../common/Badge';
 import { Modal } from '../common/Modal';
 import { emit, EVENTS } from '../../core/events';
+import { provide } from '../../core/registry';
 
 const refreshQuestionsPill = () => {
     emit(EVENTS.UPDATE_STUDENT_QUESTIONS_PILL);
-    window.updateStudentQuestionsPill?.();
 };
 
 function isDeadlineExpiredError(e) {
@@ -343,39 +343,7 @@ export default function StudentEvaluationApp() {
         };
         window.addEventListener('pagehide', onPageHide);
 
-        const onQuestionsBtnClick = () => {
-            switchView('lista');
-            cargarLista();
-        };
-        const btnQuestions = document.getElementById('questions-btn');
-        if (btnQuestions) {
-            btnQuestions.addEventListener('click', onQuestionsBtnClick);
-        }
-
-        const onCardClick = (e) => {
-            if (
-                !e.target.closest('#questions-btn') &&
-                !e.target.closest('.lb-action-btn')
-            ) {
-                switchView('lista');
-                cargarLista();
-            }
-        };
-        const qCardStudent = document.getElementById('lb-card-questions');
-        if (qCardStudent) {
-            qCardStudent.addEventListener('click', onCardClick);
-        }
-
-        const onBackClick = () => {
-            switchView('lista');
-            refreshQuestionsPill();
-        };
-        const btnQuestionsBack = document.getElementById('questionsBack');
-        if (btnQuestionsBack) {
-            btnQuestionsBack.addEventListener('click', onBackClick);
-        }
-
-        window.SPP_EVAL_ESTUDIANTE = {
+        const unsubEval = provide('eval:student', {
             abrir: () => {
                 switchView('lista');
                 cargarLista();
@@ -386,16 +354,11 @@ export default function StudentEvaluationApp() {
             recargar: () => {
                 cargarLista();
             },
-        };
+        });
 
         return () => {
             window.removeEventListener('pagehide', onPageHide);
-            if (btnQuestions)
-                btnQuestions.removeEventListener('click', onQuestionsBtnClick);
-            if (qCardStudent)
-                qCardStudent.removeEventListener('click', onCardClick);
-            if (btnQuestionsBack)
-                btnQuestionsBack.removeEventListener('click', onBackClick);
+            unsubEval();
         };
     }, [cargarLista, guardarYa, switchView]);
 

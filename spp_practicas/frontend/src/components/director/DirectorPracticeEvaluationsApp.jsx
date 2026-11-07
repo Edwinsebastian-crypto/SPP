@@ -8,31 +8,12 @@ import {
 } from '../../utils/evalBridge';
 import { Icon, Badge, BadgeOrigen, BusyButton } from '../common/Badge';
 import { EVENTS, on } from '../../core/events';
+import { getPractice } from '../../core/practiceStore';
+import { provide, inject } from '../../core/registry';
+import { resetScroll as resetScrollDirector, isPanelVisible } from '../../core/panels';
 
 function resolveActivePractice() {
-    let p = null;
-    if (window.SPP_DIRECTOR?.currentPractice) {
-        p = window.SPP_DIRECTOR.currentPractice;
-    } else if (typeof window.SPP_DIRECTOR?.getCurrentPractice === 'function') {
-        p = window.SPP_DIRECTOR.getCurrentPractice();
-    } else {
-        const selector = document.getElementById('practice-selector');
-        if (selector && selector.value) {
-            p = { id: selector.value, code: selector.value };
-        }
-    }
-    return p;
-}
-
-function resetScrollDirector() {
-    const shell = document.querySelector('.app-shell');
-    const wrapper = document.querySelector('.practice-content-wrapper');
-    const panelPreguntas = document.getElementById('questions-panel');
-    const evWrapper = panelPreguntas?.querySelector('.ev-wrapper');
-    window.scrollTo(0, 0);
-    if (shell) shell.scrollTop = 0;
-    if (wrapper) wrapper.scrollTop = 0;
-    if (evWrapper) evWrapper.scrollTop = 0;
+    return getPractice().practice || inject('director')?.getCurrentPractice?.() || null;
 }
 
 function EvaluationStatusBadge({ ev }) {
@@ -274,51 +255,26 @@ export default function DirectorPracticeEvaluationsApp() {
     };
 
     useEffect(() => {
-        const onPracticeChanged = (e) => {
-            if (e.detail?.practice) {
-                setPracticaActiva(e.detail.practice);
-                const panelPreguntas =
-                    document.getElementById('questions-panel');
-                if (
-                    panelPreguntas &&
-                    panelPreguntas.style.display !== 'none'
-                ) {
+        const onPracticeChanged = (detail) => {
+            const p = detail?.practice || detail;
+            if (p) {
+                setPracticaActiva(p);
+                if (isPanelVisible('questions-panel')) {
                     cargarListaEvaluaciones();
                 }
             }
         };
         const unsubPractice = on(EVENTS.DIRECTOR_PRACTICE_CHANGED, onPracticeChanged);
 
-        const qBtn = document.getElementById('questions-btn');
-        const qCard = document.getElementById('lb-card-questions');
-        const onQBtnClick = () => {
-            setTimeout(cargarListaEvaluaciones, 10);
-        };
-        const onQCardClick = (e) => {
-            if (!e.target.closest('#questions-btn')) {
-                setTimeout(cargarListaEvaluaciones, 10);
-            }
-        };
-        if (qBtn) qBtn.addEventListener('click', onQBtnClick);
-        if (qCard) qCard.addEventListener('click', onQCardClick);
-
-        const qBack = document.getElementById('questionsBack');
-        const onQBackClick = () => {
-            switchView('lista');
-        };
-        if (qBack) qBack.addEventListener('click', onQBackClick);
-
-        window.SPP_EVAL_DIRECTOR = {
+        const unsubEval = provide('eval:director', {
             abrir: () => cargarListaEvaluaciones(),
             volverALista: () => switchView('lista'),
             recargar: () => cargarListaEvaluaciones(),
-        };
+        });
 
         return () => {
             unsubPractice();
-            if (qBtn) qBtn.removeEventListener('click', onQBtnClick);
-            if (qCard) qCard.removeEventListener('click', onQCardClick);
-            if (qBack) qBack.removeEventListener('click', onQBackClick);
+            unsubEval();
         };
     }, [cargarListaEvaluaciones, switchView]);
 

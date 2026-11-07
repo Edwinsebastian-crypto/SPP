@@ -333,8 +333,156 @@ export function initShell() {
     initShellDOM();
 }
 
+export function activateNav(hash) {
+    if (typeof document === 'undefined' || !hash) return;
+    const link =
+        document.querySelector(`.app-navigation a[href="${hash}"]`) ||
+        document.querySelector(`.app-nav-link[href="${hash}"]`) ||
+        document.querySelector(`a[href="${hash}"]`);
+    if (link) link.click();
+}
+
+export function onNavClick(hash, handler) {
+    if (typeof document === 'undefined' || !hash || typeof handler !== 'function') {
+        return () => {};
+    }
+    const link =
+        document.querySelector(`.app-navigation a[href="${hash}"]`) ||
+        document.querySelector(`a[href="${hash}"]`);
+    if (!link) return () => {};
+    link.addEventListener('click', handler);
+    return () => link.removeEventListener('click', handler);
+}
+
+export function scrollCardIntoShellView(card, sectionId) {
+    if (typeof document === 'undefined' || !card) return;
+    const shell = document.querySelector('.app-shell');
+    const isMobile = isMobileLayout();
+    if (isMobile && shell) {
+        const sectionEl = sectionId ? document.getElementById(sectionId) : null;
+        const topbar = sectionEl && sectionEl.querySelector('.app-topbar');
+        const topbarHeight = topbar ? topbar.offsetHeight : 0;
+        const cardTop =
+            card.getBoundingClientRect().top -
+            shell.getBoundingClientRect().top +
+            shell.scrollTop;
+        shell.scrollTo({
+            top: Math.max(0, cardTop - topbarHeight - 24),
+            behavior: 'smooth'
+        });
+        window.scrollTo(0, 0);
+    } else {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+export function initLoginSplash() {
+    if (typeof document === 'undefined') return () => {};
+    const splash = document.getElementById('spp-splash');
+    if (!splash) return () => {};
+
+    let shouldShow = false;
+    try {
+        if (!sessionStorage.getItem('spp-intro-shown')) {
+            sessionStorage.setItem('spp-intro-shown', '1');
+            shouldShow = true;
+        }
+    } catch (_) {
+        shouldShow = true;
+    }
+
+    if (shouldShow) {
+        splash.classList.remove('is-hidden');
+        const timer = setTimeout(() => {
+            splash.classList.add('splash-out');
+            splash.addEventListener(
+                'animationend',
+                () => {
+                    splash.remove();
+                },
+                { once: true }
+            );
+        }, 1700);
+        return () => clearTimeout(timer);
+    }
+    splash.remove();
+    return () => {};
+}
+
+export function bindLogoutLinks(handler) {
+    if (typeof document === 'undefined' || typeof handler !== 'function') return () => {};
+    const logoutLinks = Array.from(document.querySelectorAll('.app-logout'));
+    logoutLinks.forEach((link) => link.addEventListener('click', handler));
+    return () => {
+        logoutLinks.forEach((link) => link.removeEventListener('click', handler));
+    };
+}
+
+export function updateProfileDOM(user, rolesMap) {
+    if (typeof document === 'undefined' || !user) return;
+    const fullName = ((user.firstName || '') + ' ' + (user.lastName || '')).trim();
+
+    document.querySelectorAll('.app-account strong').forEach((el) => {
+        el.textContent = fullName;
+    });
+    document.querySelectorAll('.app-account small').forEach((el) => {
+        el.textContent = (rolesMap && rolesMap[user.role]) || user.role;
+    });
+
+    const capitalize = (text) =>
+        text ? String(text).charAt(0).toUpperCase() + String(text).slice(1) : '';
+
+    document.querySelectorAll('.profile-info-text').forEach((block) => {
+        const labelEl = block.querySelector('.profile-info-label');
+        const label = ((labelEl && labelEl.textContent) || '').trim().toLowerCase();
+        const value = block.querySelector('.profile-info-value');
+        if (!value) return;
+        if (label.includes('name')) value.textContent = fullName;
+        else if (label.startsWith('id'))
+            value.textContent = (user.documentType || '') + ' ' + (user.documentNumber || '');
+        else if (label.includes('email')) value.textContent = user.email || '';
+        else if (label.includes('program')) value.textContent = user.program || 'Unassigned';
+        else if (label.includes('status')) value.textContent = capitalize(user.status);
+    });
+}
+
+export function syncNotificationBellBadges(unread) {
+    if (typeof document === 'undefined') return;
+    const buttons = Array.from(
+        document.querySelectorAll('.topbar-icon[aria-label="Notifications"]')
+    );
+    buttons.forEach((button) => {
+        let badge = button.querySelector('.bell-badge');
+        if (!unread) {
+            if (badge) badge.remove();
+            button.removeAttribute('data-unread');
+            return;
+        }
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'bell-badge';
+            button.appendChild(badge);
+        }
+        badge.textContent = unread > 99 ? '99+' : String(unread);
+        button.setAttribute('data-unread', String(unread));
+    });
+}
+
+export function getNotificationBellButtons() {
+    if (typeof document === 'undefined') return [];
+    return Array.from(document.querySelectorAll('.topbar-icon[aria-label="Notifications"]'));
+}
+
 export default {
     scrollAppShellToReveal,
     updateAppTopbarOffset,
-    initShell
+    initShell,
+    activateNav,
+    onNavClick,
+    scrollCardIntoShellView,
+    initLoginSplash,
+    bindLogoutLinks,
+    updateProfileDOM,
+    syncNotificationBellBadges,
+    getNotificationBellButtons
 };

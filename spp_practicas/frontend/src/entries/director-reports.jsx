@@ -19,6 +19,7 @@ import ReportsDashboardApp from '../components/reports/ReportsDashboardApp';
 import { mountActivities } from './activities-mount';
 import { mountPanelCommon } from './panel-common-mount';
 import { habilitarEnlacesExternos } from '../utils/evalBridge';
+import { inject } from '../core/registry';
 
 function wireDirectorReportsTabs() {
     habilitarEnlacesExternos();
@@ -43,13 +44,11 @@ function wireDirectorReportsTabs() {
     const btnEvalTab = document.getElementById('btn-evaluations-tab');
     if (btnEvalTab) {
         btnEvalTab.addEventListener('click', () => {
-            if (
-                window.SPP_DIRECTOR &&
-                typeof window.SPP_DIRECTOR.cargarEvaluaciones === 'function'
-            ) {
+            const evalDashboard = inject('directorEvaluations');
+            if (evalDashboard && typeof evalDashboard.cargarEvaluaciones === 'function') {
                 const cont = document.getElementById('panel-contenido');
                 if (cont && (cont.children.length === 0 || cont.querySelector('.ev-loading'))) {
-                    window.SPP_DIRECTOR.cargarEvaluaciones();
+                    evalDashboard.cargarEvaluaciones();
                 } else {
                     initCustomSelect('#dv-lista');
                 }

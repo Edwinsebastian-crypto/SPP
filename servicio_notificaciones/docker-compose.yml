@@ -66,11 +66,6 @@ services:
       MONGO_DB: ${MONGO_DB:-spp_notificaciones}
       MONGO_URI_NOTIFICATIONS: ${MONGO_URI_NOTIFICATIONS:-}
 
-      # Bases del monolito y del servicio de evaluación: SOLO LECTURA (el servicio fuerza default_transaction_read_only).
-      DATABASE_URL_PRACTICE: ${DATABASE_URL_PRACTICE:?Define DATABASE_URL_PRACTICE en .env (la misma base de prácticas del monolito)}
-      DATABASE_URL_EVALUATION: ${DATABASE_URL_EVALUATION:-}
-      DB_SSL: ${DB_SSL:-true}
-
       # Secreto compartido con el monolito (su NOTIFICATION_SERVICE_SECRET)
       NOTIFICATION_SERVICE_SECRET: ${NOTIFICATION_SERVICE_SECRET:?Define NOTIFICATION_SERVICE_SECRET en .env (mínimo 16 caracteres, igual al del monolito)}
 

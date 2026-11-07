@@ -30,7 +30,9 @@ function requireInternalSecret(req, _res, next) {
           }
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // ignore invalid token format
+    }
   }
   throw HttpError.unauthorized('Invalid or missing internal service secret');
 }

@@ -18,7 +18,7 @@ With `NOTIFICATION_SERVICE_URL` empty nothing is published (except the legacy "p
 | Evaluation gateway: tutor `POST …/publicar` | `evaluation.published` | the student |
 | Evaluation gateway: tutor `POST /respuestas/:id/calificar` leaving the attempt `CALIFICADO` | `evaluation.graded` | the student |
 
-The bell in the top bar (`public/js/core/notifications.js`, loaded by every panel) reads `GET /api/notifications` and marks
+The bell in the top bar (`frontend/src/components/common/ProfileAndNotificationsApp.jsx`, mounted in every panel) reads `GET /api/notifications` and marks
 read with `POST /api/notifications/read`; both are proxied to the service and always answer (empty when the service is off).
 
 Time-based notifications (due-date reminders, pending-review digests) are produced by the service itself from a

@@ -4,6 +4,7 @@ import {
     confirmar as uiConfirmar,
     habilitarEnlacesExternos as uiHabilitar
 } from '../core/ui';
+import { EvalAPI } from '../core/api';
 
 export const ESTADOS = {
     BORRADOR: ['Draft', 'fa-regular fa-pen-to-square'],
@@ -75,5 +76,5 @@ export function aLocalDatetime(iso) {
 }
 
 export function getEvalAPI() {
-    return window.EvalAPI;
+    return EvalAPI;
 }

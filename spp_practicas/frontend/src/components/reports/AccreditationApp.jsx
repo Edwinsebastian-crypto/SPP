@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { get, post, showError } from '../../core/api';
 import { openExport as openExportKit } from '../../core/reports-kit';
+import { provide, inject } from '../../core/registry';
 import {
     fmt,
     pct,
@@ -617,6 +618,7 @@ export default function AccreditationApp() {
 
     const yearRef = useRef(year);
     yearRef.current = year;
+    const detailRef = useRef(null);
 
     const load = useCallback(async (targetYear) => {
         const y = targetYear !== undefined ? targetYear : yearRef.current;
@@ -641,11 +643,12 @@ export default function AccreditationApp() {
     }, []);
 
     useEffect(() => {
-        window.SPP_ACCREDITATION = {
+        const unsub = provide('accreditation', {
             reload: () => load(yearRef.current),
             datasets: DATASETS,
-        };
+        });
         load(yearRef.current);
+        return unsub;
     }, [load]);
 
     const generateAndSave = async () => {
@@ -670,9 +673,7 @@ export default function AccreditationApp() {
                     'programs'
                 )} for ${year} in MongoDB, with the complete information of the practices.`
             );
-            if (window.SPP_REPORTS && window.SPP_REPORTS.reload) {
-                window.SPP_REPORTS.reload();
-            }
+            inject('reports')?.reload?.();
         } catch (err) {
             showError(err);
         } finally {
@@ -837,10 +838,8 @@ export default function AccreditationApp() {
                         setOpenTab('overview');
                         if (nextId) {
                             requestAnimationFrame(() => {
-                                const d =
-                                    document.getElementById('rp-acc-detail');
-                                if (d)
-                                    d.scrollIntoView({
+                                if (detailRef.current)
+                                    detailRef.current.scrollIntoView({
                                         behavior: 'smooth',
                                         block: 'nearest',
                                     });
@@ -1317,6 +1316,7 @@ export default function AccreditationApp() {
 
                     {openIndicator ? (
                         <article
+                            ref={detailRef}
                             className="dv-card dv-card--wide rp-acc-detail"
                             id="rp-acc-detail"
                         >

@@ -54,7 +54,7 @@ flowchart TD
 
 ## 🏗️ Arquitectura en Capas (Layered Architecture)
 
-Cada servicio y en particular el Monolito (`SOFTWARE_SPP`) implementa una separación estricta en capas desacopladas:
+Cada servicio y en particular el Monolito (`spp_practicas`) implementa una separación estricta en capas desacopladas:
 
 ```mermaid
 graph TD
@@ -82,7 +82,7 @@ graph TD
     CapaNegocio --> CapaAccesoDatos
 ```
 
-1. **Capa de Presentación (UI)**: Código fuente React 19 empaquetado con Vite en `SOFTWARE_SPP/frontend/src`. Utiliza `createPortal` para integrarse con el shell HTML existente sin colisiones ni fuga de estilos.
+1. **Capa de Presentación (UI)**: Código fuente React 19 empaquetado con Vite en `spp_practicas/frontend/src`. Utiliza `createPortal` para integrarse con el shell HTML existente sin colisiones ni fuga de estilos.
 2. **Capa de Control**: Rutas y controladores Express / FastAPI. Se limitan a validar el payload entrante, orquestar la llamada a la capa de servicio y estructurar la respuesta JSON.
 3. **Capa de Negocio / Servicios**: Reglas de negocio puras (asignación de prácticas, cómputo de horas, agregación de reportes de acreditación, generador de cuestionarios y cálculo de notas).
 4. **Capa de Acceso a Datos (Repositorios)**: Abstracción de base de datos mediante el patrón *Repository*. Toda consulta SQL se ejecuta de forma estrictamente parametrizada (`$1, $2...`) previniendo cualquier inyección SQL.
@@ -95,7 +95,7 @@ El sistema utiliza un modelo de concurrencia y persistencia híbrido adaptado a 
 
 ### 1. Atomicidad Estricta (ACID) — Persistencia Local
 Aplica en operaciones críticas que involucran integridad de datos relacionales en **PostgreSQL**:
-- **Monolito (`SOFTWARE_SPP`)**: Implementado en [`src/repositories/base.repository.js`](file:///c:/Users/EdwinPruebas/OneDrive/Documentos/VSCODE/proyecto/SPP/SOFTWARE_SPP/src/repositories/base.repository.js) mediante el helper `transaction(fn)`. Ejecuta bloques `BEGIN ... COMMIT / ROLLBACK` asegurando que la creación de prácticas, asignación de usuarios y bitácoras sean operaciones atómicas indivisibles.
+- **Monolito (`spp_practicas`)**: Implementado en [`src/repositories/base.repository.js`](file:///c:/Users/EdwinPruebas/OneDrive/Documentos/VSCODE/proyecto/SPP/spp_practicas/src/repositories/base.repository.js) mediante el helper `transaction(fn)`. Ejecuta bloques `BEGIN ... COMMIT / ROLLBACK` asegurando que la creación de prácticas, asignación de usuarios y bitácoras sean operaciones atómicas indivisibles.
 - **Servicio de Evaluación (`servicio_evaluacion`)**: Envíos de intentos (`submit`), calificación de preguntas e inserción de respuestas se confirman en una sola transacción atómica gestionada por SQLAlchemy.
 
 ### 2. Consistencia Eventual — Comunicación Inter-Servicios
@@ -111,7 +111,7 @@ Un **Quanta arquitectónico** representa una unidad mínima de despliegue con al
 
 | Quanta / Servicio | Motor de Base de Datos | Tipo de Persistencia | Datos Gestionados | Aislamiento y Acceso |
 | :--- | :--- | :--- | :--- | :--- |
-| **Monolito (`SOFTWARE_SPP`)** | **PostgreSQL** (Supabase) + **Cloudinary** | Relacional + Storage Blob | Prácticas pedagógicas, usuarios, bitácoras, instituciones, evidencias (URLs y metadatos) y auditoría. | **Exclusivo**: Solo el Monolito tiene credenciales de lectura/escritura sobre estas tablas. |
+| **Monolito (`spp_practicas`)** | **PostgreSQL** (Supabase) + **Cloudinary** | Relacional + Storage Blob | Prácticas pedagógicas, usuarios, bitácoras, instituciones, evidencias (URLs y metadatos) y auditoría. | **Exclusivo**: Solo el Monolito tiene credenciales de lectura/escritura sobre estas tablas. |
 | **Servicio de Evaluación (`servicio_evaluacion`)** | **PostgreSQL** (Esquema de evaluación) | Relacional | Bancos de preguntas, opciones, intentos de evaluación, respuestas y calificaciones. | **Aislado**: Los demás servicios solo consultan estos datos a través de la API REST autenticada con tokens HMAC/JWT. |
 | **Servicio de Notificaciones (`servicio_notificaciones`)** | **MongoDB** | NoSQL Documental | Colección `notificaciones`: cola de correos, estado de entrega, plantillas, logs de eventos e historial de lectura en campana. | **Completamente Autónomo**: Su base de datos MongoDB es 100% privada; ningún otro servicio interactúa directamente con ella. |
 
@@ -125,15 +125,15 @@ Un **Quanta arquitectónico** representa una unidad mínima de despliegue con al
 SPP/
 ├── README.md                      # Documentación general del repositorio raíz
 │
-├── SOFTWARE_SPP/                  # Monolito principal (Backend MVC + Frontend React)
+├── spp_practicas/                 # Monolito principal (Backend MVC + Frontend React)
 │   ├── frontend/                  # [VISTA] Código fuente de la interfaz de usuario en React
-│   │   ├── src/
-│   │   │   ├── components/        # Componentes React (Auth, Practice, Director, Reports, UI)
-│   │   │   ├── core/              # Módulos transversales (API client, Shell, Exportadores, UI)
-│   │   │   ├── entries/           # Puntos de montaje Vite (login, register, tutor, student, etc.)
-│   │   │   └── utils/             # Puentes y helpers de integración
-│   │   ├── package.json           # Dependencias de frontend (React, Vite, Lucide, FontAwesome)
-│   │   └── vite.config.js         # Configuración de compilación dirigida a public/dist/
+│   │   └── src/
+│   │       ├── components/        # Componentes React (Auth, Practice, Director, Reports, Activities, Common)
+│   │       ├── core/              # Módulos transversales (api, events, registry, practiceStore, panels, shell, custom-select, reports-kit)
+│   │       ├── entries/           # Puntos de montaje Vite (login, register, student, tutor, advisor, director)
+│   │       ├── hooks/             # Hooks reutilizables (useCustomSelect)
+│   │       └── utils/             # Puentes y helpers de integración (evalBridge)
+│   ├── vite.config.js             # Configuración de compilación Vite dirigida a public/dist/
 │   │
 │   ├── public/                    # Archivos estáticos servidos por Express
 │   │   ├── dist/                  # Bundles finales compilados por Vite
@@ -181,13 +181,13 @@ SPP/
 
 ## 🛠️ Tecnologías y Frameworks Utilizados
 
-### 1. Frontend (`SOFTWARE_SPP/frontend`)
+### 1. Frontend (`spp_practicas/frontend`)
 - **React 19**: Biblioteca declarativa para la construcción de interfaces reactivas y componentes desacoplados.
 - **Vite 6**: Empaquetador y entorno de compilación de ultra-alta velocidad (ES Modules).
 - **Portales React (`createPortal`)**: Integración limpia en vistas híbridas existentes sin alterar el diseño ni romper el aislamiento DOM.
 - **FontAwesome 6 & Lucide Icons**: Iconografía vectorial institucional.
 
-### 2. Monolito Principal (`SOFTWARE_SPP`)
+### 2. Monolito Principal (`spp_practicas`)
 - **Node.js (v18+) & Express**: Núcleo del servidor, API RESTful y servicio de archivos estáticos.
 - **Arquitectura MVC / Capas Limpias**: Separación explícita en Rutas -> Controladores -> Servicios -> Repositorios.
 - **Seguridad**:
@@ -253,27 +253,22 @@ cd spp
 ### 2. Configurar Variables de Entorno
 Copia los archivos `.env.example` a `.env` en cada módulo:
 ```bash
-cp SOFTWARE_SPP/.env.example SOFTWARE_SPP/.env
+cp spp_practicas/.env.example spp_practicas/.env
 cp servicio_evaluacion/backend/.env.example servicio_evaluacion/backend/.env
 cp servicio_notificaciones/.env.example servicio_notificaciones/.env
 ```
-> Asegúrate de configurar en `SOFTWARE_SPP/.env` las credenciales de PostgreSQL, Supabase y Cloudinary.
+> Asegúrate de configurar en `spp_practicas/.env` las credenciales de PostgreSQL, Supabase y Cloudinary.
 
 ### 3. Instalar Dependencias y Compilar Frontend
 ```bash
-# Instalar dependencias del monolito
-cd SOFTWARE_SPP
-npm install
-
-# Instalar dependencias y compilar el frontend React
-cd frontend
+# Instalar dependencias del monolito y compilar el frontend React (Vite -> public/dist/)
+cd spp_practicas
 npm install
 npm run build
-cd ..
 ```
 
 ### 4. Iniciar Todos los Servicios con un Solo Comando
-Desde la carpeta `SOFTWARE_SPP`, ejecuta el orquestador automático:
+Desde la carpeta `spp_practicas`, ejecuta el orquestador automático:
 ```bash
 npm run start:all
 ```
@@ -290,7 +285,7 @@ El script iniciará concurrentemente:
 Para ejecutar la suite de pruebas del backend (unitarias, integración de gateways, exportadores y servicios):
 
 ```bash
-cd SOFTWARE_SPP
+cd spp_practicas
 npm test
 ```
 

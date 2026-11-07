@@ -3,6 +3,8 @@ import { showError } from '../../core/api';
 import { openExport as openExportKit } from '../../core/reports-kit';
 import { sync as syncCustomSelect } from '../../core/custom-select';
 import { useCustomSelect } from '../../hooks/useCustomSelect';
+import { resetScroll as panelResetScroll } from '../../core/panels';
+import { provide } from '../../core/registry';
 import {
     TIPOS,
     fecha,
@@ -249,6 +251,8 @@ export default function DirectorEvaluationsDashboardApp() {
 
     const statusSelectRef = useRef(null);
     const tutorSelectRef = useRef(null);
+    const listaRef = useRef(null);
+    const tipRef = useRef(null);
 
     // Detalle state
     const [detalleData, setDetalleData] = useState(null);
@@ -280,10 +284,6 @@ export default function DirectorEvaluationsDashboardApp() {
         (id) => dirRef.current.tutores[id] || `Tutor ${id}`,
         []
     );
-    const nombreEstudiante = useCallback(
-        (id) => dirRef.current.estudiantes[id] || `Student ${id}`,
-        []
-    );
     const etiquetaPractica = useCallback((id) => {
         const p = dirRef.current.practicas[id];
         return p
@@ -294,11 +294,7 @@ export default function DirectorEvaluationsDashboardApp() {
     const switchView = useCallback((nombre, resetScroll = true) => {
         setView(nombre);
         if (resetScroll) {
-            const w = document.querySelector('#tab-evaluations .ev-wrapper');
-            if (w) w.scrollTop = 0;
-            const rw = document.querySelector('.reports-wrapper');
-            if (rw) rw.scrollTop = 0;
-            window.scrollTo(0, 0);
+            panelResetScroll();
         }
     }, []);
 
@@ -541,7 +537,7 @@ export default function DirectorEvaluationsDashboardApp() {
         habilitarEnlacesExternos();
 
         // Tooltip wiring (#dv-tip)
-        const tip = document.getElementById('dv-tip');
+        const tip = tipRef.current;
         const moverTip = (x, y) => {
             if (!tip) return;
             const w = tip.offsetWidth,
@@ -582,9 +578,10 @@ export default function DirectorEvaluationsDashboardApp() {
         document.addEventListener('focusin', onFocusIn);
         document.addEventListener('focusout', onFocusOut);
 
-        window.SPP_DIRECTOR = window.SPP_DIRECTOR || {};
-        window.SPP_DIRECTOR.cargarEvaluaciones = cargarPanel;
-        window.SPP_DIRECTOR.getExportData = datosExportables;
+        const unsubDirector = provide('directorEvaluations', {
+            cargarEvaluaciones: cargarPanel,
+            getExportData: datosExportables,
+        });
 
         cargarPanel();
 
@@ -594,10 +591,11 @@ export default function DirectorEvaluationsDashboardApp() {
             document.removeEventListener('mouseout', onMouseOut);
             document.removeEventListener('focusin', onFocusIn);
             document.removeEventListener('focusout', onFocusOut);
+            unsubDirector();
         };
     }, [cargarPanel, datosExportables]);
 
-    useCustomSelect('#dv-lista', [todasLasEvaluaciones]);
+    useCustomSelect(listaRef, [todasLasEvaluaciones]);
 
     const filtrarTutor = (idTutor) => {
         setFilterTutor(String(idTutor));
@@ -607,8 +605,9 @@ export default function DirectorEvaluationsDashboardApp() {
                 tutorSelectRef.current.value = String(idTutor);
                 syncCustomSelect(tutorSelectRef.current);
             }
-            const lista = document.getElementById('dv-lista');
-            if (lista) lista.scrollIntoView({ behavior: 'smooth' });
+            if (listaRef.current) {
+                listaRef.current.scrollIntoView({ behavior: 'smooth' });
+            }
         });
     };
 
@@ -935,12 +934,11 @@ export default function DirectorEvaluationsDashboardApp() {
                                     onClick={() => {
                                         setSoloAlertas(true);
                                         setLimiteMostrado(15);
-                                        const el =
-                                            document.getElementById('dv-lista');
-                                        if (el)
-                                            el.scrollIntoView({
+                                        if (listaRef.current) {
+                                            listaRef.current.scrollIntoView({
                                                 behavior: 'smooth',
                                             });
+                                        }
                                     }}
                                 >
                                     {`View all ${r.alertas.length} alerts in list`}
@@ -1360,7 +1358,7 @@ export default function DirectorEvaluationsDashboardApp() {
                     </article>
 
                     {/* All evaluations */}
-                    <article className="dv-card dv-card--wide" id="dv-lista">
+                    <article ref={listaRef} className="dv-card dv-card--wide" id="dv-lista">
                         <div className="dv-card-head">
                             <div>
                                 <h3>All evaluations</h3>
@@ -2238,8 +2236,7 @@ export default function DirectorEvaluationsDashboardApp() {
                             id="btn-volver"
                             aria-label="Back to panel"
                             onClick={() => {
-                                const lista =
-                                    document.getElementById('dv-lista');
+                                const lista = listaRef.current;
                                 switchView('panel', !lista);
                                 if (lista) {
                                     requestAnimationFrame(() => {
@@ -2287,6 +2284,7 @@ export default function DirectorEvaluationsDashboardApp() {
                     <div id="detalle-contenido">{renderDetalleContent()}</div>
                 </div>
             </section>
+            <div ref={tipRef} className="dv-tip" role="tooltip" hidden />
         </>
     );
 }

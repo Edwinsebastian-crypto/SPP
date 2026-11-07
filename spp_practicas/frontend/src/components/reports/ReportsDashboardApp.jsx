@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { get, showError } from '../../core/api';
 import { openExport, registry, resetTab, datasetsToJson } from '../../core/reports-kit';
+import { getPanelElement } from '../../core/panels';
+import { provide, inject } from '../../core/registry';
 import {
     fmt,
     pct,
@@ -1646,15 +1648,13 @@ export default function ReportsDashboardApp() {
             return true;
         });
         document.body.classList.add('is-loading-wait');
-        const acc = document.getElementById('rep-accreditation-toolbar');
+        const acc = getPanelElement('rep-accreditation-toolbar');
         if (acc) acc.style.display = 'none';
 
         try {
-            if (
-                window.SPP_ACCREDITATION &&
-                typeof window.SPP_ACCREDITATION.reload === 'function'
-            ) {
-                window.SPP_ACCREDITATION.reload().catch(() => {});
+            const accApi = inject('accreditation');
+            if (accApi && typeof accApi.reload === 'function') {
+                accApi.reload().catch(() => {});
             }
             const res = await get('/api/reports/dashboard');
             TABS.forEach((tab) => resetTab(tab.key, tab.label));
@@ -1673,17 +1673,18 @@ export default function ReportsDashboardApp() {
     }, []);
 
     useEffect(() => {
-        window.SPP_REPORTS = { reload: () => reload(), tabs: TABS };
-        if (TABS.some((t) => document.getElementById(t.root))) {
+        const unsub = provide('reports', { reload: () => reload(), tabs: TABS });
+        if (TABS.some((t) => getPanelElement(t.root))) {
             reload();
         }
+        return unsub;
     }, [reload]);
 
     return (
         <>
             {TABS.map((tab) => {
-                const headContainer = document.getElementById(tab.header);
-                const rootContainer = document.getElementById(tab.root);
+                const headContainer = getPanelElement(tab.header);
+                const rootContainer = getPanelElement(tab.root);
                 const meta = TAB_META[tab.key] || {
                     title: tab.label,
                     sub: '',

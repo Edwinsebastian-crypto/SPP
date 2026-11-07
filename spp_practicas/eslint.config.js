@@ -26,10 +26,17 @@ module.exports = [
       globals: { ...globals.browser }
     },
     rules: {
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrors: 'none' }],
+      'no-unused-vars': ['warn', { varsIgnorePattern: '^React$', argsIgnorePattern: '^_', caughtErrors: 'none' }],
       'no-restricted-properties': [
         'error',
         { object: 'window', property: 'SPP', message: 'Importa desde core/ en lugar de usar window.SPP' }
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[object.name='window'][property.name=/^(SPP_|Eval|updateStudentQuestionsPill)/]",
+          message: 'Usa core/registry, core/practiceStore o imports; no globales en window'
+        }
       ]
     }
   }

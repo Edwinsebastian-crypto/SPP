@@ -21,7 +21,7 @@ function ensureEnvFiles() {
   const rootExample = path.join(ROOT, '.env.example');
   if (!fs.existsSync(rootEnv) && fs.existsSync(rootExample)) {
     fs.copyFileSync(rootExample, rootEnv);
-    console.log('[setup] Created SOFTWARE_SPP/.env from .env.example');
+    console.log('[setup] Created spp_practicas/.env from .env.example');
   }
 
   const serviceEnv = path.join(SERVICE_DIR, '.env');

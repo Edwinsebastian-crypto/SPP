@@ -3,8 +3,8 @@
 Web application to manage pedagogical practicums. Students, tutors, advisors and the practicum director work on the
 same practice: logbook, activities, evidence, feedback, question bank, grades and accreditation reports.
 
-**Stack:** Node.js 18+ · Express · Supabase Auth · PostgreSQL (Neon) · MongoDB Atlas · Cloudinary · plain HTML/CSS/JS
-front end (no build step). Deployed on Render.
+**Stack:** Node.js 18+ · Express · Supabase Auth · PostgreSQL (Neon) · MongoDB Atlas · Cloudinary · React 19 + Vite 6
+front end (`frontend/src/` compiled to `public/dist/`). Deployed on Render.
 
 ## Roles and panels
 
@@ -37,11 +37,17 @@ src/
   infrastructure/     PostgreSQL pools, Mongo, Supabase, Cloudinary, schema resolver
   utils/              HttpError, asyncHandler, validators, id generator…
   scripts/            operational CLIs
+frontend/
+  src/
+    core/             shared ES modules: api, events, registry, practiceStore, shell, panels, modals, custom-select, reports-kit
+    hooks/            useCustomSelect hook
+    components/       React components per domain (auth, home, practice, activities, student, tutor, director, reports, common)
+    entries/          Vite entry points per role/page
+    utils/            evaluation bridge and helpers
 public/
-  pages/              one HTML panel per role
+  pages/              one HTML shell per role
+  dist/               Vite compiled bundles served by Express
   css/                variables, shell, per-panel styles
-  js/core/            shared code: api, session, shell, notifications (bell), panels, modals, custom-select, credential
-  js/pages/           per-panel code (student, tutor, advisor, director, users, login)
   img/
 database/             SQL schema (evaluation DB) + local test fixture (practice DB)
 tests/                unit · repository integration · HTTP end-to-end
@@ -95,6 +101,7 @@ The former Spanish variable names still work as aliases, so an existing `.env` k
 
 | Command | Purpose |
 |---|---|
+| `npm run build` | build the React front end (`frontend/src/` → `public/dist/`) |
 | `npm start` / `npm run dev` | run the server |
 | `npm run schema:verify` | check database tables |
 | `npm run users:migrate` / `director:create` | create Supabase access accounts |
@@ -139,12 +146,15 @@ Use `DATABASE_URL_PRACTICE_TEST` to point at another local instance.
 
 ## Front end notes
 
+* **React + Vite architecture**: Source lives in `frontend/src/` and builds into `public/dist/` via `npm run build`.
+  Cross-component communication uses `frontend/src/core/events.js` (`EVENTS`, `emit`, `on`), `frontend/src/core/registry.js`
+  (`provide`, `inject`), and `frontend/src/core/practiceStore.js` (`getPractice`, `setPractice`, `usePractice`) instead of
+  `window.*` globals.
 * **Mobile layout** (`max-width: 900px` or `max-height: 500px`): `.app-shell` is the only scrolling container; the top
-  bar is `position: fixed`. Do not call `scrollIntoView()` on cards or use `window.scrollTo` to move around a panel;
-  use `SPP.panels.resetScroll()` or scroll `.app-shell` (see `revealCard` in `public/js/pages/director.api.js`),
-  otherwise the page title can end up hidden under the top bar.
+  bar is `position: fixed`. Use `resetScroll()` from `frontend/src/core/panels.js` or `scrollCardIntoShellView()` from
+  `frontend/src/core/shell.js` so the page title never ends up hidden under the top bar.
 * `shell.js` also resets any stray window/body scroll on mobile as a safety net.
-* After a deploy, hard-refresh (or clear the cache) to avoid running old JS/CSS files.
+* After changing files in `frontend/src/`, run `npm run build` and hard-refresh to load the updated bundle in `public/dist/`.
 
 ## Notes
 

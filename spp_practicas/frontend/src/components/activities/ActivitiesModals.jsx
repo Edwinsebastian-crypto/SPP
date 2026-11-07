@@ -22,7 +22,7 @@ export function parseGoogleLink(raw) {
     try {
         url = new URL(String(raw || '').trim());
     } catch (err) {
-        throw new Error('That is not a valid link.');
+        throw new Error('That is not a valid link.', { cause: err });
     }
     if (url.protocol !== 'https:' || !GOOGLE_HOSTS[url.hostname]) {
         throw new Error(

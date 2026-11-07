@@ -140,6 +140,15 @@ export function session() {
     return sessionPromise;
 }
 
+let configPromise = null;
+/** Public application configuration (a single request per page). */
+export function getConfig() {
+    if (!configPromise) {
+        configPromise = request('/api/config', { method: 'GET', skipRedirect: true, showCursorWait: false }).catch(() => ({}));
+    }
+    return configPromise;
+}
+
 export async function logout() {
     try { await request('/api/auth/logout', { method: 'POST', body: {}, skipRedirect: true }); } catch (e) { /* we leave anyway */ }
     if (typeof window !== 'undefined') {
@@ -254,10 +263,6 @@ export const EvalAPI = {
     },
 };
 
-if (typeof window !== 'undefined') {
-    window.EvalAPI = EvalAPI;
-}
-
 const api = {
     setWait,
     forceReleaseWait,
@@ -273,6 +278,7 @@ const api = {
     formatActivityDate,
     ROLES,
     session,
+    getConfig,
     logout,
     showError,
     EvalAPI,

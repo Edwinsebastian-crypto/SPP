@@ -17,6 +17,9 @@ import QuestionModal from './QuestionModal';
 import GenerateAIModal from './GenerateAIModal';
 import AttemptRowQuestion from './AttemptRowQuestion';
 import { EVENTS, on } from '../../core/events';
+import { getPractice } from '../../core/practiceStore';
+import { provide, inject } from '../../core/registry';
+import { isPanelVisible } from '../../core/panels';
 
 export default function TutorEvaluationApp() {
     const qs = new URLSearchParams(window.location.search);
@@ -76,7 +79,7 @@ export default function TutorEvaluationApp() {
         let nextPractica = practicaRef.current;
         let nextEstudiante = estudianteRef.current;
 
-        const actual = window.SPP_TEACHER?.state?.practice;
+        const actual = getPractice().practice;
         if (actual && (actual.id || actual.code)) {
             nextPractica = String(actual.id || actual.code || '');
             nextEstudiante = String(
@@ -134,7 +137,7 @@ export default function TutorEvaluationApp() {
             });
             const items = Array.isArray(data) ? data : [];
             setLista(items);
-            window.SPP_TEACHER?.updateQuestionsPill?.(items, true);
+            inject('logbook')?.updateQuestionsPill?.(items, true);
         } catch (e) {
             setErrorLista(e.message || 'Could not load evaluations.');
         } finally {
@@ -235,55 +238,8 @@ export default function TutorEvaluationApp() {
             }
         })();
 
-        const onBtnPreguntasClick = () => {
-            resolverPractica()
-                .catch(() => {})
-                .then(() => {
-                    switchView('lista');
-                    cargarLista();
-                });
-        };
-
-        const onCardTutorClick = (e) => {
-            if (
-                !e.target.closest('#preguntas-preguntas-btn') &&
-                !e.target.closest('.lb-action-btn')
-            ) {
-                resolverPractica()
-                    .catch(() => {})
-                    .then(() => {
-                        switchView('lista');
-                        cargarLista();
-                    });
-            }
-        };
-
-        let btnPreguntas = null;
-        let qCardTutor = null;
-        if (!window.SPP_TEACHER) {
-            btnPreguntas = document.getElementById('preguntas-preguntas-btn');
-            if (btnPreguntas) {
-                btnPreguntas.addEventListener('click', onBtnPreguntasClick);
-            }
-            qCardTutor =
-                document.getElementById('lb-card-questions') ||
-                document.getElementById('lb-card-tutor-questions');
-            if (qCardTutor) {
-                qCardTutor.addEventListener('click', onCardTutorClick);
-            }
-        }
-
-        const onBackClick = () => {
-            switchView('lista');
-            window.SPP_TEACHER?.updateQuestionsPill?.(null, true);
-        };
-        const btnQuestionsBack = document.getElementById('questionsBack');
-        if (btnQuestionsBack) {
-            btnQuestionsBack.addEventListener('click', onBackClick);
-        }
-
-        const onPracticeChange = (e) => {
-            const p = e.detail;
+        const onPracticeChange = (detail) => {
+            const p = detail?.practice || detail;
             if (p && (p.id || p.code)) {
                 const nextP = String(p.id || p.code || '');
                 const nextE = String(p.student || p.studentName || '');
@@ -292,19 +248,14 @@ export default function TutorEvaluationApp() {
                 setPractica(nextP);
                 setEstudiante(nextE);
                 setContextText(nextE ? nextE : '');
-                const qPanel = document.getElementById('questions-panel');
-                if (
-                    qPanel &&
-                    qPanel.style.display !== 'none' &&
-                    !qPanel.hidden
-                ) {
+                if (isPanelVisible('questions-panel')) {
                     cargarLista();
                 }
             }
         };
         const unsubPractice = on(EVENTS.PRACTICE, onPracticeChange, document);
 
-        window.SPP_EVAL_TUTOR = {
+        const unsubEval = provide('eval:tutor', {
             abrir: () => {
                 resolverPractica()
                     .catch(() => {})
@@ -319,10 +270,9 @@ export default function TutorEvaluationApp() {
             recargar: () => {
                 cargarLista();
             },
-        };
+        });
 
-        const qPanel = document.getElementById('questions-panel');
-        if (!qPanel || (qPanel.style.display !== 'none' && !qPanel.hidden)) {
+        if (isPanelVisible('questions-panel')) {
             resolverPractica()
                 .catch(() => {})
                 .then(() => cargarLista());
@@ -331,13 +281,8 @@ export default function TutorEvaluationApp() {
         }
 
         return () => {
-            if (btnPreguntas)
-                btnPreguntas.removeEventListener('click', onBtnPreguntasClick);
-            if (qCardTutor)
-                qCardTutor.removeEventListener('click', onCardTutorClick);
-            if (btnQuestionsBack)
-                btnQuestionsBack.removeEventListener('click', onBackClick);
             unsubPractice();
+            unsubEval();
         };
     }, [cargarLista, resolverPractica, switchView]);
 

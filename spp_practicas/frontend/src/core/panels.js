@@ -7,6 +7,7 @@
    ========================================================================= */
 
 import { updateAppTopbarOffset } from './shell.js';
+import { sync as syncCustomSelect } from './custom-select.js';
 
 const byId = (id) => (typeof document !== 'undefined' ? document.getElementById(id) : null);
 
@@ -16,7 +17,7 @@ export function resetScroll() {
     window.scrollTo(0, 0);
     if (document.documentElement) document.documentElement.scrollTop = 0;
     if (document.body) document.body.scrollTop = 0;
-    document.querySelectorAll('.app-shell, .practice-content-wrapper, .reports-wrapper, .ptm-panel, .inst-panel, .um-panel, .logbook-panel, .activities-panel, .questions-panel, .evidences-panel').forEach((el) => {
+    document.querySelectorAll('.app-shell, .practice-content-wrapper, .reports-wrapper, .ev-wrapper, .ptm-panel, .inst-panel, .um-panel, .logbook-panel, .activities-panel, .questions-panel, .evidences-panel').forEach((el) => {
         el.scrollTop = 0;
     });
     if (typeof updateAppTopbarOffset === 'function') {
@@ -205,10 +206,67 @@ export function showPanel(targetId, display) {
     resetScroll();
 }
 
+export function isPanelVisible(targetId) {
+    if (typeof document === 'undefined') return false;
+    const el = targetId === 'practice-panel'
+        ? (document.querySelector('#practice .practice-panel') || document.querySelector('.practice-panel'))
+        : byId(targetId);
+    return Boolean(el && el.style.display !== 'none' && !el.hidden);
+}
+
+export function getPanelElement(targetId) {
+    if (typeof document === 'undefined') return null;
+    if (targetId === 'practice-panel') {
+        return document.querySelector('#practice .practice-panel') || document.querySelector('.practice-panel');
+    }
+    return byId(targetId);
+}
+
+export function onQuestionsBack(handler) {
+    if (typeof document === 'undefined') return () => {};
+    const qBack = byId('questionsBack');
+    if (!qBack) return () => {};
+    qBack.addEventListener('click', handler);
+    return () => qBack.removeEventListener('click', handler);
+}
+
+export function removeLegacyModals(ids = ['am-modal', 'delete-confirm-modal']) {
+    if (typeof document === 'undefined') return;
+    ids.forEach((id) => {
+        const existing = byId(id);
+        if (existing && !existing.dataset.reactManaged) {
+            existing.remove();
+        }
+    });
+}
+
+export function selectPracticeById(practiceId) {
+    if (typeof document === 'undefined' || !practiceId) return;
+    const select = byId('practice-selector');
+    if (
+        select &&
+        String(select.value) !== String(practiceId) &&
+        Array.from(select.options).some((o) => o.value === String(practiceId))
+    ) {
+        select.value = String(practiceId);
+        syncCustomSelect(select);
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+}
+
+export function triggerPracticeEnter() {
+    if (typeof document === 'undefined') return;
+    const panel = document.querySelector('#practice .practice-panel');
+    const enter = document.querySelector('#practice .practice-submit');
+    if (panel && enter && panel.style.display !== 'none' && !enter.disabled) {
+        enter.click();
+    }
+}
+
 if (typeof document !== 'undefined') {
     document.addEventListener('click', () => closeAllMenus(null));
 }
 
-const panels = { resetScroll, swap, link, bindMenu, bindCardList, closeAllMenus, wireStandardFlow, wireTabs, showPanel, PANEL_IDS };
+const panels = { resetScroll, swap, link, bindMenu, bindCardList, closeAllMenus, wireStandardFlow, wireTabs, showPanel, isPanelVisible, getPanelElement, onQuestionsBack, removeLegacyModals, selectPracticeById, triggerPracticeEnter, PANEL_IDS };
 
 export default panels;

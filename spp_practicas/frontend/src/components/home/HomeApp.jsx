@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { get, session, ROLES, formatDate as apiFormatDate, formatActivityDate as apiFormatActivityDate } from '../../core/api';
-import { sync as syncCustomSelect } from '../../core/custom-select';
-import { showPanel } from '../../core/panels';
+import { showPanel, selectPracticeById, triggerPracticeEnter } from '../../core/panels';
+import { activateNav, onNavClick } from '../../core/shell';
 import { EVENTS, emit, on } from '../../core/events';
 
 const REFRESH_AFTER_MS = 30000;
@@ -245,40 +245,19 @@ export default function HomeApp() {
     const formatActivityDate = (v) => apiFormatActivityDate(v) || '—';
 
     const go = useCallback((hash) => {
-        const link = document.querySelector('.app-navigation a[href="' + hash + '"]');
-        if (link) link.click();
+        activateNav(hash);
     }, []);
 
     const showPracticeInformation = useCallback(() => {
         go('#practice');
-        const practicePanel = document.querySelector('#practice .practice-panel');
-        if (practicePanel) practicePanel.style.display = 'block';
-        ['#logbook-panel', '#activities-panel', '#questions-panel', '#evidences-panel'].forEach(
-            (sel) => {
-                const el = document.querySelector(sel);
-                if (el) el.style.display = 'none';
-            }
-        );
-        window.scrollTo(0, 0);
+        showPanel('practice-panel', 'block');
     }, [go]);
 
     const openActivityFromHome = useCallback(
         (practiceId, activityId) => {
             go('#practice');
-            const select = document.getElementById('practice-selector');
-            if (
-                select &&
-                practiceId &&
-                String(select.value) !== String(practiceId) &&
-                Array.from(select.options).some((o) => o.value === String(practiceId))
-            ) {
-                select.value = String(practiceId);
-                syncCustomSelect(select);
-                select.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-
+            selectPracticeById(practiceId);
             showPanel('evidences-panel', 'flex');
-
             emit(EVENTS.OPEN_ACTIVITY, { practiceId, activityId });
             window.scrollTo(0, 0);
         },
@@ -288,40 +267,19 @@ export default function HomeApp() {
     const openUploadEvidence = useCallback(
         (practiceId) => {
             go('#practice');
-            const select = document.getElementById('practice-selector');
-            if (
-                select &&
-                practiceId &&
-                String(select.value) !== String(practiceId) &&
-                Array.from(select.options).some((o) => o.value === String(practiceId))
-            ) {
-                select.value = String(practiceId);
-                syncCustomSelect(select);
-                select.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-
+            selectPracticeById(practiceId);
             showPanel('activities-panel', 'flex');
-
             emit(EVENTS.OPEN_UPLOAD_EVIDENCE, { practiceId });
-
             setTimeout(() => {
                 emit(EVENTS.OPEN_UPLOAD_EVIDENCE, { practiceId });
-                const modal = document.getElementById('am-modal');
-                if (!modal) {
-                    const btn = document.getElementById('amOpenBtnActivities');
-                    if (btn) btn.click();
-                }
             }, 60);
-
             window.scrollTo(0, 0);
         },
         [go]
     );
 
     const enterPractice = useCallback(() => {
-        const panel = document.querySelector('#practice .practice-panel');
-        const enter = document.querySelector('#practice .practice-submit');
-        if (panel && enter && panel.style.display !== 'none' && !enter.disabled) enter.click();
+        triggerPracticeEnter();
     }, []);
 
     const openPractice = useCallback(
@@ -337,17 +295,7 @@ export default function HomeApp() {
                 return;
             }
             go('#practice');
-            const select = document.getElementById('practice-selector');
-            if (
-                select &&
-                id &&
-                String(select.value) !== String(id) &&
-                Array.from(select.options).some((o) => o.value === String(id))
-            ) {
-                select.value = String(id);
-                syncCustomSelect(select);
-                select.dispatchEvent(new Event('change', { bubbles: true }));
-            }
+            selectPracticeById(id);
             enterPractice();
         },
         [go, enterPractice]
@@ -356,10 +304,7 @@ export default function HomeApp() {
     const openUsersList = useCallback(() => {
         go('#manage-users');
         setTimeout(() => {
-            const tab = document.querySelector(
-                '#manage-users .um-tab-btn[data-um-panel="um-panel-list"]'
-            );
-            if (tab) tab.click();
+            emit(EVENTS.OPEN_USERS_LIST);
         }, 0);
     }, [go]);
 
@@ -411,23 +356,22 @@ export default function HomeApp() {
     }, []);
 
     useEffect(() => {
-        const homeLink = document.querySelector('.app-navigation a[href="#home"]');
         const onHomeRefresh = () => load(true);
         const onHomeLinkClick = () => load(false);
 
         const unsubHome = on(EVENTS.HOME_REFRESH, onHomeRefresh);
-        if (homeLink) homeLink.addEventListener('click', onHomeLinkClick);
+        const unsubNav = onNavClick('#home', onHomeLinkClick);
 
         const hash = window.location.hash;
         const landsOnHome = !hash || hash === '#home';
         if (landsOnHome) {
-            if (homeLink) homeLink.click();
+            activateNav('#home');
             load(true);
         }
 
         return () => {
             unsubHome();
-            if (homeLink) homeLink.removeEventListener('click', onHomeLinkClick);
+            unsubNav();
         };
     }, [load]);
 

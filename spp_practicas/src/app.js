@@ -32,9 +32,6 @@ function createApp(container = createContainer()) {
   app.get('/api/config', (_req, res) => {
     res.json({ institutionalDomain: env.institutionalDomain });
   });
-  app.get('/js/config.js', (_req, res) => {
-    res.type('application/javascript').send(`window.SPP_DOMAIN = ${JSON.stringify(env.institutionalDomain)};`);
-  });
   for (const folder of STATIC_FOLDERS) {
     app.use(`/${folder}`, express.static(path.join(PUBLIC_DIR, folder), { maxAge: env.isProduction ? '1h' : 0 }));
   }

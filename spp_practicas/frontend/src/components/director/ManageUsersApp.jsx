@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { get, post, put, patch, del } from '../../core/api';
+import { get, getConfig, post, put, patch, del } from '../../core/api';
 import { alert as alertModal, confirm as confirmModal } from '../../core/modals';
 import { resetScroll } from '../../core/panels';
+import { activateNav } from '../../core/shell';
 import { useCustomSelect } from '../../hooks/useCustomSelect';
 import { EVENTS, emit, on } from '../../core/events';
 
@@ -170,12 +171,10 @@ function CredentialCard({
 }
 
 export default function ManageUsersApp() {
-    const [institutionalDomain, setInstitutionalDomain] = useState(
-        typeof window !== 'undefined' && window.SPP_DOMAIN ? window.SPP_DOMAIN : 'university.edu'
-    );
+    const [institutionalDomain, setInstitutionalDomain] = useState('university.edu');
 
     useEffect(() => {
-        get('/api/config')
+        getConfig()
             .then((cfg) => {
                 if (cfg && cfg.institutionalDomain) {
                     setInstitutionalDomain(cfg.institutionalDomain);
@@ -216,7 +215,6 @@ export default function ManageUsersApp() {
     const [selectedIds, setSelectedIds] = useState(new Set());
 
     // Modal state
-    const [modalBodyEl, setModalBodyEl] = useState(null);
     const [modalUser, setModalUser] = useState(null);
     const [modalPracticeId, setModalPracticeId] = useState(null);
 
@@ -289,8 +287,6 @@ export default function ManageUsersApp() {
     const closeModals = useCallback(() => {
         setModalUser(null);
         setModalPracticeId(null);
-        const modal = document.getElementById('um-modal-credential');
-        if (modal) modal.style.display = 'none';
     }, []);
 
     const openCredential = useCallback(async (user) => {
@@ -313,29 +309,15 @@ export default function ManageUsersApp() {
         }
         setModalUser(normalized);
         setModalPracticeId(activePid);
-        const modal = document.getElementById('um-modal-credential');
-        if (modal) modal.style.display = 'flex';
     }, []);
 
     useEffect(() => {
-        const body = document.getElementById('um-modal-credential-body');
-        if (body) {
-            body.innerHTML = '';
-            setModalBodyEl(body);
-        }
-
         const unsubModal = on(EVENTS.OPEN_USER_MODAL, (detail) => {
             if (detail && detail.user) openCredential(detail.user);
         });
-
-        const closeBtns = Array.from(document.querySelectorAll('[data-um-close]'));
-        closeBtns.forEach((b) => b.addEventListener('click', closeModals));
-
-        const modal = document.getElementById('um-modal-credential');
-        const handleOverlayClick = (e) => {
-            if (e.target === modal) closeModals();
-        };
-        if (modal) modal.addEventListener('click', handleOverlayClick);
+        const unsubList = on(EVENTS.OPEN_USERS_LIST, () => {
+            setActiveTab('um-panel-list');
+        });
 
         const handleKey = (e) => {
             if (e.key === 'Escape') closeModals();
@@ -344,8 +326,7 @@ export default function ManageUsersApp() {
 
         return () => {
             unsubModal();
-            closeBtns.forEach((b) => b.removeEventListener('click', closeModals));
-            if (modal) modal.removeEventListener('click', handleOverlayClick);
+            unsubList();
             document.removeEventListener('keydown', handleKey);
         };
     }, [openCredential, closeModals]);
@@ -2005,24 +1986,42 @@ export default function ManageUsersApp() {
                 </div>
             </div>
 
-            {modalBodyEl && modalUser
+            {modalUser && typeof document !== 'undefined'
                 ? createPortal(
-                      <CredentialCard
-                          user={modalUser}
-                          domain={domain}
-                          activePracticeId={modalPracticeId}
-                          onOpenLogbook={(practiceId) => {
-                              closeModals();
-                              emit(EVENTS.OPEN_PRACTICE, { id: practiceId });
-                              const link = document.querySelector(
-                                  '.app-nav-link[href="#practice"]'
-                              );
-                              if (link) link.click();
+                      <div
+                          id="um-modal-credential"
+                          className="modal-overlay"
+                          style={{ display: 'flex' }}
+                          onClick={(e) => {
+                              if (e.target === e.currentTarget) closeModals();
                           }}
-                          onApprove={(u) => handleApproveUser(u, true)}
-                          onReject={(u) => handleRejectUser(u, true)}
-                      />,
-                      modalBodyEl
+                      >
+                          <div className="modal-content um-modal-card">
+                              <div id="um-modal-credential-body">
+                                  <CredentialCard
+                                      user={modalUser}
+                                      domain={domain}
+                                      activePracticeId={modalPracticeId}
+                                      onOpenLogbook={(practiceId) => {
+                                          closeModals();
+                                          emit(EVENTS.OPEN_PRACTICE, { id: practiceId });
+                                          activateNav('#practice');
+                                      }}
+                                      onApprove={(u) => handleApproveUser(u, true)}
+                                      onReject={(u) => handleRejectUser(u, true)}
+                                  />
+                              </div>
+                              <button
+                                  type="button"
+                                  className="um-modal-close"
+                                  data-um-close
+                                  onClick={closeModals}
+                              >
+                                  Close
+                              </button>
+                          </div>
+                      </div>,
+                      document.body
                   )
                 : null}
         </div>

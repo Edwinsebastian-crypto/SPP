@@ -74,8 +74,8 @@ function uploadForm() {
   ok(r.status === 302 && r.headers.get('location') === '/pages/director.html', 'each role only sees its own panel');
   r = await new Client().request('GET', '/pages/director.html');
   ok(r.status === 302 && r.headers.get('location') === '/index.html', 'panels require a session');
-  r = await new Client().request('GET', '/js/config.js');
-  ok(r.status === 200, 'config.js (domain) is available');
+  r = await new Client().request('GET', '/api/config');
+  ok(r.status === 200 && r.data && r.data.institutionalDomain, '/api/config (domain) is available');
 
   console.log('# Attack: self-registering in Supabase with somebody else\'s e-mail');
   createAccount('intruder-director@udi.edu.co', 'Intruder123', {}, true);

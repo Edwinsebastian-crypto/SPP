@@ -2,10 +2,12 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { get, patch, del, showError, formatDate as apiFormatDate, EvalAPI } from '../../core/api';
 import { alert as alertModal, confirm as confirmModal } from '../../core/modals';
-import { resetScroll as panelResetScroll, showPanel } from '../../core/panels';
+import { showPanel, getPanelElement, onQuestionsBack } from '../../core/panels';
 import { sync as syncCustomSelect } from '../../core/custom-select';
 import { useCustomSelect } from '../../hooks/useCustomSelect';
 import { EVENTS, emit, on } from '../../core/events';
+import { getPractice, setPractice as setPracticeStore, usePractice } from '../../core/practiceStore';
+import { provide, inject } from '../../core/registry';
 
 const STATUS_COLORS = { active: '#265c48', completed: '#6b7280', cancelled: '#b3261e' };
 
@@ -46,19 +48,10 @@ function computeLogbookHero(logbook) {
     };
 }
 
-function resetScroll() {
-    panelResetScroll();
-    window.scrollTo(0, 0);
-    const appShell = document.querySelector('.app-shell');
-    if (appShell) appShell.scrollTop = 0;
-    const wrapper = document.querySelector('.practice-content-wrapper');
-    if (wrapper) wrapper.scrollTop = 0;
-}
-
 export default function PracticeAndLogbookApp({ role }) {
     const [practicePanelEl, setPracticePanelEl] = useState(null);
     const [logbookPanelEl, setLogbookPanelEl] = useState(null);
-    const [credModalBodyEl, setCredModalBodyEl] = useState(null);
+    const { activitiesBadges } = usePractice();
 
     const [loading, setLoading] = useState(true);
     const [practices, setPractices] = useState([]);
@@ -103,11 +96,8 @@ export default function PracticeAndLogbookApp({ role }) {
 
     // Locate target DOM containers on mount
     useEffect(() => {
-        const pPanel =
-            document.querySelector('#practice .practice-panel') ||
-            document.querySelector('.practice-panel');
-        const lPanel = document.getElementById('logbook-panel');
-        const cBody = document.getElementById('lb-modal-credential-body');
+        const pPanel = getPanelElement('practice-panel');
+        const lPanel = getPanelElement('logbook-panel');
 
         if (pPanel) {
             pPanel.innerHTML = '';
@@ -116,10 +106,6 @@ export default function PracticeAndLogbookApp({ role }) {
         if (lPanel) {
             lPanel.innerHTML = '';
             setLogbookPanelEl(lPanel);
-        }
-        if (cBody) {
-            cBody.innerHTML = '';
-            setCredModalBodyEl(cBody);
         }
     }, []);
 
@@ -141,13 +127,6 @@ export default function PracticeAndLogbookApp({ role }) {
 
             const setPillState = (text, isWarning) => {
                 setQuestionsPill({ text, isWarning, loading: false });
-                const qPill = document.getElementById('lb-questions-pill');
-                if (qPill) {
-                    qPill.textContent = text;
-                    qPill.className = isWarning
-                        ? 'lb-card-pill lb-card-pill--warning'
-                        : 'lb-card-pill lb-card-pill--uptodate';
-                }
             };
 
             if (!p) {
@@ -155,7 +134,7 @@ export default function PracticeAndLogbookApp({ role }) {
                 return;
             }
 
-            const evalApi = EvalAPI || window.EvalAPI;
+            const evalApi = EvalAPI;
             if (!evalApi) {
                 setPillState('Up to date', false);
                 return;
@@ -409,9 +388,12 @@ export default function PracticeAndLogbookApp({ role }) {
             const prev = currentPracticeRef.current;
             const isSwitching = prev && String(prev.id) !== String(practiceObj.id);
             if (isSwitching) {
-                ['lb-hours-pill', 'lb-pending-pill', 'lb-questions-pill'].forEach((pid) => {
-                    const el = document.getElementById(pid);
-                    if (el) el.classList.add('is-skel-pill');
+                setQuestionsPill((prevPill) => ({ ...prevPill, loading: true }));
+                setPracticeStore({
+                    activitiesBadges: {
+                        ...getPractice().activitiesBadges,
+                        loading: true
+                    }
                 });
             }
 
@@ -419,8 +401,9 @@ export default function PracticeAndLogbookApp({ role }) {
             currentPracticeRef.current = practiceObj;
             setEditOpen(false);
 
+            let studentCred = null;
             if (role !== 'student') {
-                const studentCred = {
+                studentCred = {
                     fullName: practiceObj.student,
                     documentType: practiceObj.studentDetails?.documentType,
                     documentNumber: practiceObj.studentDocument,
@@ -428,23 +411,20 @@ export default function PracticeAndLogbookApp({ role }) {
                     program: practiceObj.studentDetails?.program,
                     email: practiceObj.studentDetails?.email
                 };
-                window.SPP_CURRENT_STUDENT = studentCred;
             }
 
+            setPracticeStore({
+                practice: practiceObj,
+                practices: listOverride || practicesRef.current,
+                student: studentCred
+            });
+
             if (role === 'student') {
-                window.SPP_STUDENT_PRACTICE = practiceObj;
                 emit(EVENTS.STUDENT_PRACTICE, { practice: practiceObj });
             } else if (role === 'tutor' || role === 'advisor') {
-                window.SPP_TEACHER = window.SPP_TEACHER || { state: {} };
-                window.SPP_TEACHER.state = window.SPP_TEACHER.state || {};
-                window.SPP_TEACHER.state.practices = listOverride || practicesRef.current;
-                window.SPP_TEACHER.state.practice = practiceObj;
                 emit(EVENTS.PRACTICE, practiceObj, document);
                 emit(EVENTS.PRACTICE, practiceObj, window);
             } else if (role === 'director') {
-                window.SPP_DIRECTOR = window.SPP_DIRECTOR || {};
-                window.SPP_DIRECTOR.currentPractice = practiceObj;
-                window.SPP_DIRECTOR.getCurrentPractice = () => currentPracticeRef.current;
                 emit(EVENTS.DIRECTOR_PRACTICE_CHANGED, { practice: practiceObj });
             }
 
@@ -489,47 +469,38 @@ export default function PracticeAndLogbookApp({ role }) {
         [role, selectPractice]
     );
 
-    // Expose global helpers expected by evaluations & other apps
+    const reloadLogbook = useCallback(async () => {
+        const cur = currentPracticeRef.current;
+        if (!cur) return;
+        const { practice: fresh } = await get(`/api/practices/${cur.id}`);
+        setPractices((prev) => prev.map((p) => (p.id === fresh.id ? fresh : p)));
+        setCurrentPractice(fresh);
+        currentPracticeRef.current = fresh;
+        setPracticeStore({ practice: fresh });
+    }, []);
+
+    // Expose role helpers via registry & events
     useEffect(() => {
         if (role === 'student') {
-            const unsub = on(EVENTS.UPDATE_STUDENT_QUESTIONS_PILL, () =>
+            return on(EVENTS.UPDATE_STUDENT_QUESTIONS_PILL, () =>
                 updateQuestionsPill(currentPracticeRef.current, null, true)
             );
-            window.updateStudentQuestionsPill = () =>
-                updateQuestionsPill(currentPracticeRef.current, null, true);
-            return unsub;
         } else if (role === 'tutor' || role === 'advisor') {
-            window.SPP_TEACHER = window.SPP_TEACHER || {
-                state: {
-                    practices: [],
-                    practice: null,
-                    activities: [],
-                    activity: null,
-                    evidences: []
-                }
-            };
-            window.SPP_TEACHER.updateQuestionsPill = (prefetched, force) =>
-                updateQuestionsPill(currentPracticeRef.current, prefetched, force);
-            window.SPP_TEACHER.updateLogbookHero = (lb) => {
-                setCurrentPractice((prev) => (prev ? { ...prev, logbook: lb } : prev));
-            };
-            window.SPP_TEACHER.reloadLogbook = async () => {
-                const cur = currentPracticeRef.current;
-                if (!cur) return;
-                const { practice: fresh } = await get(`/api/practices/${cur.id}`);
-                setPractices((prev) => prev.map((p) => (p.id === fresh.id ? fresh : p)));
-                setCurrentPractice(fresh);
-                currentPracticeRef.current = fresh;
-                if (window.SPP_TEACHER && window.SPP_TEACHER.state) {
-                    window.SPP_TEACHER.state.practice = fresh;
-                }
-            };
+            return provide('logbook', {
+                updateQuestionsPill: (prefetched, force) =>
+                    updateQuestionsPill(currentPracticeRef.current, prefetched, force),
+                updateLogbookHero: (lb) => {
+                    setCurrentPractice((prev) => (prev ? { ...prev, logbook: lb } : prev));
+                },
+                reloadLogbook
+            });
         } else if (role === 'director') {
-            window.SPP_DIRECTOR = window.SPP_DIRECTOR || {};
-            window.SPP_DIRECTOR.getCurrentPractice = () => currentPracticeRef.current;
-            window.SPP_DIRECTOR.reloadPractices = (preferredId) => loadPractices(preferredId);
+            return provide('director', {
+                getCurrentPractice: () => currentPracticeRef.current,
+                reloadPractices: (preferredId) => loadPractices(preferredId)
+            });
         }
-    }, [role, updateQuestionsPill, loadPractices]);
+    }, [role, updateQuestionsPill, loadPractices, reloadLogbook]);
 
     // Initial load & global event listeners
     useEffect(() => {
@@ -566,39 +537,18 @@ export default function PracticeAndLogbookApp({ role }) {
 
     // Wire `#questionsBack` button in `#questions-panel`
     useEffect(() => {
-        const qBack = document.getElementById('questionsBack');
-        if (!qBack) return;
-        const handleBack = () => {
+        return onQuestionsBack(() => {
             showPanel('logbook-panel', role === 'director' ? 'block' : 'flex');
-            if (
-                role === 'director' &&
-                window.SPP_EVAL_DIRECTOR &&
-                typeof window.SPP_EVAL_DIRECTOR.volverALista === 'function'
-            ) {
-                window.SPP_EVAL_DIRECTOR.volverALista();
+            if (role === 'director') {
+                inject('eval:director')?.volverALista?.();
+            } else if (role === 'student') {
+                inject('eval:student')?.volverALista?.();
+            } else if (role === 'tutor') {
+                inject('eval:tutor')?.volverALista?.();
             }
             updateQuestionsPill(currentPracticeRef.current, null, true);
-        };
-        qBack.addEventListener('click', handleBack);
-        return () => qBack.removeEventListener('click', handleBack);
+        });
     }, [role, updateQuestionsPill]);
-
-    // Wire tutor `#success-modal` close buttons if present
-    useEffect(() => {
-        if (role !== 'tutor') return;
-        const modal = document.getElementById('success-modal');
-        const closeX = document.getElementById('successModalCloseX');
-        const acceptBtn = document.getElementById('successModalAcceptBtn');
-        const close = () => {
-            if (modal) modal.style.display = 'none';
-        };
-        if (closeX) closeX.addEventListener('click', close);
-        if (acceptBtn) acceptBtn.addEventListener('click', close);
-        return () => {
-            if (closeX) closeX.removeEventListener('click', close);
-            if (acceptBtn) acceptBtn.removeEventListener('click', close);
-        };
-    }, [role]);
 
     // Close Director 3-dot menu on outside click
     useEffect(() => {
@@ -611,13 +561,6 @@ export default function PracticeAndLogbookApp({ role }) {
         document.addEventListener('click', handleOutside);
         return () => document.removeEventListener('click', handleOutside);
     }, [role, dirMenuOpen]);
-
-    // Close Student Credential modal on overlay click
-    useEffect(() => {
-        const modal = document.getElementById('lb-modal-credential');
-        if (!modal) return;
-        modal.style.display = credStudent ? 'flex' : 'none';
-    }, [credStudent]);
 
     // Handlers
     const handleEnterLogbook = () => {
@@ -635,24 +578,12 @@ export default function PracticeAndLogbookApp({ role }) {
 
     const handleEnterQuestions = () => {
         showPanel('questions-panel', role === 'director' ? 'block' : 'flex');
-        if (
-            role === 'student' &&
-            window.SPP_EVAL_ESTUDIANTE &&
-            typeof window.SPP_EVAL_ESTUDIANTE.abrir === 'function'
-        ) {
-            window.SPP_EVAL_ESTUDIANTE.abrir();
-        } else if (
-            role === 'tutor' &&
-            window.SPP_EVAL_TUTOR &&
-            typeof window.SPP_EVAL_TUTOR.abrir === 'function'
-        ) {
-            window.SPP_EVAL_TUTOR.abrir();
-        } else if (
-            role === 'director' &&
-            window.SPP_EVAL_DIRECTOR &&
-            typeof window.SPP_EVAL_DIRECTOR.abrir === 'function'
-        ) {
-            window.SPP_EVAL_DIRECTOR.abrir();
+        if (role === 'student') {
+            inject('eval:student')?.abrir?.();
+        } else if (role === 'tutor') {
+            inject('eval:tutor')?.abrir?.();
+        } else if (role === 'director') {
+            inject('eval:director')?.abrir?.();
         }
     };
 
@@ -688,17 +619,11 @@ export default function PracticeAndLogbookApp({ role }) {
             currentPracticeRef.current = updatedPractice;
             setEditOpen(false);
 
-            const modal = document.getElementById('success-modal');
-            const titleEl = document.getElementById('success-modal-title');
-            const msgEl = document.getElementById('success-modal-message');
-            if (modal && titleEl && msgEl) {
-                titleEl.textContent = 'Success';
-                msgEl.textContent = 'Logbook updated successfully!';
-                modal.style.display = 'flex';
-            }
-            if (window.SPP_TEACHER && window.SPP_TEACHER.reloadLogbook) {
-                await window.SPP_TEACHER.reloadLogbook();
-            }
+            await alertModal({
+                title: 'Success',
+                message: 'Logbook updated successfully!'
+            });
+            await reloadLogbook();
         } catch (err) {
             showError(err);
         }
@@ -723,9 +648,7 @@ export default function PracticeAndLogbookApp({ role }) {
         try {
             await del(`/api/practices/${currentPractice.id}`);
             await loadPractices();
-            if (window.SPP_REPORTS && window.SPP_REPORTS.reload) {
-                window.SPP_REPORTS.reload();
-            }
+            inject('reports')?.reload?.();
             emit(EVENTS.HOME_REFRESH);
             await alertModal({
                 title: 'Practice deleted',
@@ -737,8 +660,9 @@ export default function PracticeAndLogbookApp({ role }) {
     };
 
     const handleOpenStudentCred = () => {
-        if (window.SPP_CURRENT_STUDENT) {
-            setCredStudent(window.SPP_CURRENT_STUDENT);
+        const st = getPractice().student;
+        if (st) {
+            setCredStudent(st);
         }
     };
 
@@ -832,7 +756,10 @@ export default function PracticeAndLogbookApp({ role }) {
                                                   className="ev-dropdown-item ev-item--delete"
                                                   id="btn-delete-practice"
                                                   role="menuitem"
-                                                  style={{ color: '#b3261e' }}
+                                                  style={{
+                                                      color: '#b3261e',
+                                                      display: activitiesBadges.canDelete ? 'flex' : 'none'
+                                                  }}
                                                   onClick={handleDeletePracticeDirector}
                                               >
                                                   <i
@@ -1390,15 +1317,15 @@ export default function PracticeAndLogbookApp({ role }) {
                                           <i className="fa-regular fa-clipboard"></i>
                                       </div>
                                       <span
-                                          className="lb-card-pill is-skel-pill"
+                                          className={
+                                              activitiesBadges.loading
+                                                  ? 'lb-card-pill is-skel-pill'
+                                                  : 'lb-card-pill'
+                                          }
                                           id="lb-hours-pill"
-                                          ref={(el) => {
-                                              if (el && !el.dataset.init) {
-                                                  el.dataset.init = '1';
-                                                  el.textContent = '0 / 0 h';
-                                              }
-                                          }}
-                                      />
+                                      >
+                                          {activitiesBadges.hoursText}
+                                      </span>
                                   </div>
                                   <div className="lb-card-body">
                                       <h3 className="lb-card-title">Activities</h3>
@@ -1408,15 +1335,17 @@ export default function PracticeAndLogbookApp({ role }) {
                                   </div>
                                   <div className="lb-card-bottom">
                                       <span
-                                          className="lb-card-pill is-skel-pill"
+                                          className={
+                                              activitiesBadges.loading
+                                                  ? 'lb-card-pill is-skel-pill'
+                                                  : activitiesBadges.isWarning
+                                                  ? 'lb-card-pill lb-card-pill--warning'
+                                                  : 'lb-card-pill lb-card-pill--uptodate'
+                                          }
                                           id="lb-pending-pill"
-                                          ref={(el) => {
-                                              if (el && !el.dataset.init) {
-                                                  el.dataset.init = '1';
-                                                  el.textContent = 'Up to date';
-                                              }
-                                          }}
-                                      />
+                                      >
+                                          {activitiesBadges.pendingText}
+                                      </span>
                                       <button
                                           type="button"
                                           className="lb-action-btn"
@@ -1499,67 +1428,78 @@ export default function PracticeAndLogbookApp({ role }) {
                   )
                 : null}
 
-            {credModalBodyEl && credStudent
+            {credStudent && typeof document !== 'undefined'
                 ? createPortal(
-                      <>
-                          <article className="lb-cred">
-                              <header className="lb-cred-top">
-                                  <div className="lb-cred-brand">
-                                      <i
-                                          className="fa-solid fa-shield-halved"
-                                          aria-hidden="true"
-                                      ></i>
-                                      <p>
-                                          University
-                                          <br />
-                                          credential <em>{new Date().getFullYear()}</em>
-                                      </p>
-                                  </div>
-                                  <span
-                                      className={`lb-cred-state lb-cred-state--${
-                                          credStudent.status || 'active'
-                                      }`}
+                      <div
+                          id="lb-modal-credential"
+                          className="modal-overlay"
+                          style={{ display: 'flex' }}
+                          onClick={(e) => {
+                              if (e.target === e.currentTarget) setCredStudent(null);
+                          }}
+                      >
+                          <div className="um-modal-card">
+                              <div id="lb-modal-credential-body">
+                                  <article className="lb-cred">
+                                      <header className="lb-cred-top">
+                                          <div className="lb-cred-brand">
+                                              <i
+                                                  className="fa-solid fa-shield-halved"
+                                                  aria-hidden="true"
+                                              ></i>
+                                              <p>
+                                                  University
+                                                  <br />
+                                                  credential <em>{new Date().getFullYear()}</em>
+                                              </p>
+                                          </div>
+                                          <span
+                                              className={`lb-cred-state lb-cred-state--${
+                                                  credStudent.status || 'active'
+                                              }`}
+                                          >
+                                              {String(credStudent.status || 'active').toUpperCase()}
+                                          </span>
+                                      </header>
+                                      <div className="lb-cred-body">
+                                          <h3 className="lb-cred-name">{credStudent.fullName}</h3>
+                                          <p className="lb-cred-doc">
+                                              {`${credStudent.documentType || '-'}  •  ${
+                                                  credStudent.documentNumber || '—'
+                                              }`}
+                                          </p>
+                                          <span className="lb-cred-role">
+                                              <i
+                                                  className="fa-solid fa-user-graduate"
+                                                  aria-hidden="true"
+                                              ></i>
+                                              Student
+                                          </span>
+                                          <dl className="lb-cred-meta">
+                                              <div>
+                                                  <dt>Academic program</dt>
+                                                  <dd>{credStudent.program || 'Unassigned'}</dd>
+                                              </div>
+                                              <div>
+                                                  <dt>Email</dt>
+                                                  <dd className="is-mono">
+                                                      {credStudent.email || 'user@university.edu'}
+                                                  </dd>
+                                              </div>
+                                          </dl>
+                                      </div>
+                                  </article>
+                                  <button
+                                      type="button"
+                                      className="lb-modal-close"
+                                      onClick={() => setCredStudent(null)}
                                   >
-                                      {String(credStudent.status || 'active').toUpperCase()}
-                                  </span>
-                              </header>
-                              <div className="lb-cred-body">
-                                  <h3 className="lb-cred-name">{credStudent.fullName}</h3>
-                                  <p className="lb-cred-doc">
-                                      {`${credStudent.documentType || '-'}  •  ${
-                                          credStudent.documentNumber || '—'
-                                      }`}
-                                  </p>
-                                  <span className="lb-cred-role">
-                                      <i
-                                          className="fa-solid fa-user-graduate"
-                                          aria-hidden="true"
-                                      ></i>
-                                      Student
-                                  </span>
-                                  <dl className="lb-cred-meta">
-                                      <div>
-                                          <dt>Academic program</dt>
-                                          <dd>{credStudent.program || 'Unassigned'}</dd>
-                                      </div>
-                                      <div>
-                                          <dt>Email</dt>
-                                          <dd className="is-mono">
-                                              {credStudent.email || 'user@university.edu'}
-                                          </dd>
-                                      </div>
-                                  </dl>
+                                      Close
+                                  </button>
                               </div>
-                          </article>
-                          <button
-                              type="button"
-                              className="lb-modal-close"
-                              onClick={() => setCredStudent(null)}
-                          >
-                              Close
-                          </button>
-                      </>,
-                      credModalBodyEl
+                          </div>
+                      </div>,
+                      document.body
                   )
                 : null}
         </>

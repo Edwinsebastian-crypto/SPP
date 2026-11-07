@@ -11,9 +11,11 @@ import {
     formatDateTime,
     formatActivityDate
 } from '../../core/api';
-import { resetScroll as panelResetScroll, showPanel } from '../../core/panels';
+import { showPanel, getPanelElement, removeLegacyModals } from '../../core/panels';
 import { scrollAppShellToReveal } from '../../core/shell';
 import { EVENTS, on } from '../../core/events';
+import { getPractice, setPractice as setPracticeStore } from '../../core/practiceStore';
+import { provide, inject } from '../../core/registry';
 import {
     fileIcon,
     StudentEvidenceModal,
@@ -23,15 +25,6 @@ import {
     ConfirmDeleteModal,
     SuccessNoticeModal,
 } from './ActivitiesModals';
-
-function resetScroll() {
-    panelResetScroll();
-    window.scrollTo(0, 0);
-    const appShell = document.querySelector('.app-shell');
-    if (appShell) appShell.scrollTop = 0;
-    const wrapper = document.querySelector('.practice-content-wrapper');
-    if (wrapper) wrapper.scrollTop = 0;
-}
 
 export function getActivityStatusInfo(activity) {
     const rawGrade = activity.grade;
@@ -304,12 +297,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
 
     // Remove static legacy modals in student.html / tutor.html so IDs don't collide
     useEffect(() => {
-        ['am-modal', 'delete-confirm-modal'].forEach((id) => {
-            const existing = document.getElementById(id);
-            if (existing && !existing.dataset.reactManaged) {
-                existing.remove();
-            }
-        });
+        removeLegacyModals(['am-modal', 'delete-confirm-modal']);
         session()
             .then((u) => setCurrentUser(u))
             .catch(() => {});
@@ -318,71 +306,46 @@ export default function ActivitiesAndEvidencesApp({ role }) {
     const updateLogbookBadges = useCallback(
         (list, prac) => {
             const p = prac || practiceRef.current;
-            const pendingSelector =
-                role === 'director'
-                    ? '#practice #lb-pending-pill'
-                    : '#lb-pending-pill';
-            const hoursSelector =
-                role === 'director'
-                    ? '#practice #lb-hours-pill'
-                    : '#lb-hours-pill';
+            let pendingText = 'Up to date';
+            let isWarning = false;
 
-            const pendingPill =
-                document.querySelector(pendingSelector) ||
-                document.getElementById('lb-pending-pill');
-            if (pendingPill) {
-                if (role === 'tutor' || role === 'advisor') {
-                    const reviewCount = (list || []).filter(
-                        (a) => getActivityStatusInfo(a).category === 'review'
-                    ).length;
-                    if (reviewCount > 0) {
-                        pendingPill.textContent = `${reviewCount} pending review`;
-                        pendingPill.className =
-                            'lb-card-pill lb-card-pill--warning';
-                    } else {
-                        pendingPill.textContent = 'Up to date';
-                        pendingPill.className =
-                            'lb-card-pill lb-card-pill--uptodate';
-                    }
-                } else {
-                    const pendingCount = (list || []).filter(
-                        (a) => getActivityStatusInfo(a).category === 'pending'
-                    ).length;
-                    if (pendingCount > 0) {
-                        pendingPill.textContent = `${pendingCount} pending`;
-                        pendingPill.className =
-                            'lb-card-pill lb-card-pill--warning';
-                    } else {
-                        pendingPill.textContent = 'Up to date';
-                        pendingPill.className =
-                            'lb-card-pill lb-card-pill--uptodate';
-                    }
+            if (role === 'tutor' || role === 'advisor') {
+                const reviewCount = (list || []).filter(
+                    (a) => getActivityStatusInfo(a).category === 'review'
+                ).length;
+                if (reviewCount > 0) {
+                    pendingText = `${reviewCount} pending review`;
+                    isWarning = true;
+                }
+            } else {
+                const pendingCount = (list || []).filter(
+                    (a) => getActivityStatusInfo(a).category === 'pending'
+                ).length;
+                if (pendingCount > 0) {
+                    pendingText = `${pendingCount} pending`;
+                    isWarning = true;
                 }
             }
 
-            const hoursPill =
-                document.querySelector(hoursSelector) ||
-                document.getElementById('lb-hours-pill');
-            if (hoursPill) {
-                const targetHours =
-                    p?.hours != null && !Number.isNaN(Number(p.hours))
-                        ? p.hours
-                        : 0;
-                const totalWorked = (list || []).reduce(
-                    (sum, act) => sum + (Number(act.hours) || 0),
-                    0
-                );
-                hoursPill.textContent = `${totalWorked} / ${targetHours} h`;
-                hoursPill.classList.remove('is-skel-pill');
-            }
+            const targetHours =
+                p?.hours != null && !Number.isNaN(Number(p.hours))
+                    ? p.hours
+                    : 0;
+            const totalWorked = (list || []).reduce(
+                (sum, act) => sum + (Number(act.hours) || 0),
+                0
+            );
+            const hoursText = `${totalWorked} / ${targetHours} h`;
 
-            if (role === 'director') {
-                const btnDel = document.getElementById('btn-delete-practice');
-                if (btnDel) {
-                    btnDel.style.display =
-                        (list || []).length === 0 ? 'flex' : 'none';
-                }
-            }
+            setPracticeStore({
+                activitiesBadges: {
+                    hoursText,
+                    pendingText,
+                    isWarning,
+                    loading: false,
+                    canDelete: (list || []).length === 0,
+                },
+            });
         },
         [role]
     );
@@ -409,7 +372,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
             if (String(loadedPracticeIdRef.current) !== String(p.id)) {
                 setLoadingActivities(true);
             }
-            let list = [];
+            let list;
             try {
                 const data = await get(`/api/practices/${p.id}/activities`);
                 list = data.activities || [];
@@ -436,9 +399,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
             setLoadingActivities(false);
             updateLogbookBadges(list, p);
 
-            if (window.SPP_TEACHER?.state) {
-                window.SPP_TEACHER.state.activities = list;
-            }
+            setPracticeStore({ activities: list });
 
             const idToSync = targetActivityId || currentActivityRef.current?.id;
             if (idToSync) {
@@ -447,9 +408,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                 );
                 if (updated) {
                     setCurrentActivity(updated);
-                    if (window.SPP_TEACHER?.state) {
-                        window.SPP_TEACHER.state.activity = updated;
-                    }
+                    setPracticeStore({ activity: updated });
                 }
             }
         },
@@ -474,9 +433,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
             const fbList = fbRes.feedback || [];
             setEvidences(evList);
             setFeedbacks(fbList);
-            if (window.SPP_TEACHER?.state) {
-                window.SPP_TEACHER.state.evidences = evList;
-            }
+            setPracticeStore({ evidences: evList });
         } catch (err) {
             showError(err);
         } finally {
@@ -487,9 +444,10 @@ export default function ActivitiesAndEvidencesApp({ role }) {
     // Connect to role-specific practice state & events
     useEffect(() => {
         if (role === 'student') {
-            if (window.SPP_STUDENT_PRACTICE) {
-                setPractice(window.SPP_STUDENT_PRACTICE);
-                loadActivities(window.SPP_STUDENT_PRACTICE);
+            const stored = getPractice().practice;
+            if (stored) {
+                setPractice(stored);
+                loadActivities(stored);
             }
             return on(EVENTS.STUDENT_PRACTICE, (detail) => {
                 const p = detail?.practice || detail;
@@ -503,21 +461,22 @@ export default function ActivitiesAndEvidencesApp({ role }) {
         }
 
         if (role === 'tutor' || role === 'advisor') {
-            window.SPP_TEACHER = window.SPP_TEACHER || { state: {} };
-            window.SPP_TEACHER.refreshActivities = (actId) =>
-                loadActivities(actId);
-            window.SPP_TEACHER.displayActivity = (act) => {
-                if (act) {
-                    setCurrentActivity(act);
-                    setEvidences([]);
-                    setFeedbacks([]);
-                    loadEvidenceAndFeedback(act, true);
-                }
-            };
+            provide('activities', {
+                refreshActivities: (actId) => loadActivities(actId),
+                displayActivity: (act) => {
+                    if (act) {
+                        setCurrentActivity(act);
+                        setEvidences([]);
+                        setFeedbacks([]);
+                        loadEvidenceAndFeedback(act, true);
+                    }
+                },
+            });
 
-            if (window.SPP_TEACHER.state?.practice) {
-                setPractice(window.SPP_TEACHER.state.practice);
-                loadActivities(window.SPP_TEACHER.state.practice);
+            const stored = getPractice().practice;
+            if (stored) {
+                setPractice(stored);
+                loadActivities(stored);
             }
 
             const unsubTeacher = on(EVENTS.PRACTICE, (p) => {
@@ -532,9 +491,10 @@ export default function ActivitiesAndEvidencesApp({ role }) {
         }
 
         if (role === 'director') {
+            const directorApi = inject('director');
             const initial =
-                window.SPP_DIRECTOR?.getCurrentPractice?.() ||
-                window.SPP_DIRECTOR?.currentPractice;
+                directorApi?.getCurrentPractice?.() ||
+                getPractice().practice;
             if (initial) {
                 setPractice(initial);
                 loadActivities(initial);
@@ -551,25 +511,21 @@ export default function ActivitiesAndEvidencesApp({ role }) {
         }
     }, [role, loadActivities, loadEvidenceAndFeedback]);
 
-
-
-    const handleOpenActivity = (activity) => {
+    const handleOpenActivity = useCallback((activity) => {
         setCurrentActivity(activity);
         setEvidences([]);
         setFeedbacks([]);
         setIsEditingGrade(false);
         setFeedbackText('');
         setEditingFeedbackId(null);
-        if (window.SPP_TEACHER?.state) {
-            window.SPP_TEACHER.state.activity = activity;
-        }
+        setPracticeStore({ activity });
         loadEvidenceAndFeedback(activity, true);
         showPanel('evidences-panel', role === 'student' ? 'block' : 'flex');
-    };
+    }, [role, loadEvidenceAndFeedback]);
 
     useEffect(() => {
-        const onOpenActivityEvent = async (e) => {
-            const { practiceId, activityId } = e.detail || {};
+        const onOpenActivityEvent = async (detail) => {
+            const { practiceId, activityId } = detail || {};
             if (!activityId) return;
 
             let act = activities.find((a) => String(a.id) === String(activityId));
@@ -577,7 +533,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                 const targetPracticeId =
                     practiceId ||
                     practiceRef.current?.id ||
-                    window.SPP_TEACHER?.state?.practice?.id;
+                    getPractice().practice?.id;
                 if (targetPracticeId) {
                     try {
                         const data = await get(
@@ -608,7 +564,9 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                         act = list.find(
                             (a) => String(a.id) === String(activityId)
                         );
-                    } catch (_) {}
+                    } catch (_) {
+                        /* ignore */
+                    }
                 }
             }
 
@@ -623,9 +581,10 @@ export default function ActivitiesAndEvidencesApp({ role }) {
     useEffect(() => {
         const onOpenUploadEvidenceEvent = () => {
             showPanel('activities-panel', 'flex');
-            if (!practice && window.SPP_STUDENT_PRACTICE) {
-                setPractice(window.SPP_STUDENT_PRACTICE);
-                loadActivities(window.SPP_STUDENT_PRACTICE);
+            const stored = getPractice().practice;
+            if (!practice && stored) {
+                setPractice(stored);
+                loadActivities(stored);
             }
             setStudentModalState({
                 open: true,
@@ -682,7 +641,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                 )}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(
                     now.getMinutes()
                 )}:${pad(now.getSeconds())}`;
-                const currentP = practice || window.SPP_STUDENT_PRACTICE;
+                const currentP = practice || getPractice().practice;
                 if (!currentP) throw new Error('Practice not found');
                 const createRes = await request(
                     `/api/practices/${currentP.id}/activities`,
@@ -963,8 +922,8 @@ export default function ActivitiesAndEvidencesApp({ role }) {
             ? rawCurrentGrade.toFixed(1)
             : 'Not graded';
 
-    const activitiesPanelEl = document.getElementById('activities-panel');
-    const evidencesPanelEl = document.getElementById('evidences-panel');
+    const activitiesPanelEl = getPanelElement('activities-panel');
+    const evidencesPanelEl = getPanelElement('evidences-panel');
 
     return (
         <>

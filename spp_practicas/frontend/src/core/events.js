@@ -14,6 +14,7 @@ export const EVENTS = Object.freeze({
     PRACTICES_CHANGED: 'spp:practices-changed',
     HOME_REFRESH: 'spp:home-refresh',
     OPEN_USER_MODAL: 'spp:open-user-modal',
+    OPEN_USERS_LIST: 'spp:open-users-list',
     OPEN_PRACTICE: 'spp:open-practice',
     UPDATE_STUDENT_QUESTIONS_PILL: 'spp:update-student-questions-pill'
 });

@@ -2,8 +2,10 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { get, post, put, del, showError } from '../../core/api';
 import { alert as alertModal, confirm as confirmModal } from '../../core/modals';
 import { resetScroll } from '../../core/panels';
+import { onNavClick, scrollCardIntoShellView } from '../../core/shell';
 import { useCustomSelect } from '../../hooks/useCustomSelect';
 import { EVENTS, emit, on } from '../../core/events';
+import { inject } from '../../core/registry';
 
 export default function PracticeTypesApp() {
     const [activeTab, setActiveTab] = useState('ptm-panel-register');
@@ -46,7 +48,6 @@ export default function PracticeTypesApp() {
     useEffect(() => {
         loadTypes();
 
-        const navLink = document.querySelector('a[href="#manage-practices"]');
         const handleNavClick = () => {
             resetForm();
         };
@@ -54,11 +55,11 @@ export default function PracticeTypesApp() {
             loadTypes();
         };
 
-        if (navLink) navLink.addEventListener('click', handleNavClick);
+        const unsubNav = onNavClick('#manage-practices', handleNavClick);
         const unsubPractices = on(EVENTS.PRACTICES_CHANGED, handlePracticesChanged);
 
         return () => {
-            if (navLink) navLink.removeEventListener('click', handleNavClick);
+            unsubNav();
             unsubPractices();
         };
     }, [loadTypes, resetForm]);
@@ -85,24 +86,7 @@ export default function PracticeTypesApp() {
                     `.ptm-type-card[data-id="${String(id).replace(/"/g, '')}"]`
                 );
             if (!card) return;
-            const shell = document.querySelector('.app-shell');
-            const isMobile = window.innerWidth <= 900 || window.innerHeight <= 500;
-            if (isMobile && shell) {
-                const sectionEl = document.getElementById('manage-practices');
-                const topbar = sectionEl && sectionEl.querySelector('.app-topbar');
-                const topbarHeight = topbar ? topbar.offsetHeight : 0;
-                const cardTop =
-                    card.getBoundingClientRect().top -
-                    shell.getBoundingClientRect().top +
-                    shell.scrollTop;
-                shell.scrollTo({
-                    top: Math.max(0, cardTop - topbarHeight - 24),
-                    behavior: 'smooth'
-                });
-                window.scrollTo(0, 0);
-            } else {
-                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            scrollCardIntoShellView(card, 'manage-practices');
         }, 40);
         setTimeout(() => setHighlightId(null), 2400);
     };
@@ -130,9 +114,7 @@ export default function PracticeTypesApp() {
             resetForm();
             await loadTypes();
             emit(EVENTS.DATA_CHANGED);
-            if (window.SPP_REPORTS && window.SPP_REPORTS.reload) {
-                window.SPP_REPORTS.reload();
-            }
+            inject('reports')?.reload?.();
             revealCard(savedId);
             await alertModal({
                 title: isEdit ? 'Practice type updated' : 'Practice type created',
@@ -181,9 +163,7 @@ export default function PracticeTypesApp() {
             await del(`/api/practice-types/${type.id}`);
             await loadTypes();
             emit(EVENTS.DATA_CHANGED);
-            if (window.SPP_REPORTS && window.SPP_REPORTS.reload) {
-                window.SPP_REPORTS.reload();
-            }
+            inject('reports')?.reload?.();
             await alertModal({
                 title: 'Practice type deleted',
                 message: 'The practice type was deleted successfully.'

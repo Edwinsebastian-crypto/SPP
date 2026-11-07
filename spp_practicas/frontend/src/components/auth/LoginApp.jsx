@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { request } from '../../core/api';
+import { initLoginSplash } from '../../core/shell';
 
 export default function LoginApp() {
     const [username, setUsername] = useState('');
@@ -9,35 +10,7 @@ export default function LoginApp() {
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
-        const splash = document.getElementById('spp-splash');
-        if (!splash) return;
-
-        let shouldShow = false;
-        try {
-            if (!sessionStorage.getItem('spp-intro-shown')) {
-                sessionStorage.setItem('spp-intro-shown', '1');
-                shouldShow = true;
-            }
-        } catch (_) {
-            shouldShow = true;
-        }
-
-        if (shouldShow) {
-            splash.classList.remove('is-hidden');
-            const timer = setTimeout(() => {
-                splash.classList.add('splash-out');
-                splash.addEventListener(
-                    'animationend',
-                    () => {
-                        splash.remove();
-                    },
-                    { once: true }
-                );
-            }, 1700);
-            return () => clearTimeout(timer);
-        } else {
-            splash.remove();
-        }
+        return initLoginSplash();
     }, []);
 
     const handleSubmit = async (e) => {

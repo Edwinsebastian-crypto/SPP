@@ -13,7 +13,7 @@ browser ──session cookie──▶ /api/evaluations/*  (this app)  ──2-mi
 | HTTP client + token signing (HS256, `sub` = document number) | `src/infrastructure/evaluation-service.js` |
 | Allow-list of routes, practice authorization, error translation | `src/services/evaluation-gateway.service.js` |
 | Express handlers / routes | `src/controllers/evaluation.controller.js`, `src/routes/evaluations.routes.js` |
-| Screens | `public/pages/{student,tutor,director}.html` (sección de preguntas y pestaña Evaluations), `public/js/core/*`, `public/css/evaluacion.css` |
+| Screens | `public/pages/{student,tutor,director}.html` (sección de preguntas y pestaña Evaluations), `frontend/src/components/{student,tutor,director}/*`, `frontend/src/core/api.js`, `public/css/evaluacion.css` |
 | Tests | `tests/evaluation-gateway.test.js` (`npm run test:evaluations`, no database needed) |
 
 No npm dependency was added (Node 18+ `fetch` and `crypto`).
@@ -58,5 +58,5 @@ per-tutor table and the list of all evaluations with a per-question detail. It i
   validated here; anything else is dropped.
 
 Alerts are computed by the service (`services/estadisticas.py`): attempt waiting for grading 3+ days, published after its
-deadline, draft for 14+ days, published for 7+ days with no attempts. Charts are plain HTML/CSS (the CSP does not allow
+deadline, draft for 14+ days, published for 7+ days with no attempts. Charts are rendered directly with React and CSS (the CSP does not allow
 external libraries). The screen uses the live evaluation gateway and core session.

@@ -2,7 +2,9 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { get, post, put, del, showError } from '../../core/api';
 import { alert as alertModal, confirm as confirmModal } from '../../core/modals';
 import { resetScroll } from '../../core/panels';
+import { onNavClick, scrollCardIntoShellView } from '../../core/shell';
 import { EVENTS, emit, on } from '../../core/events';
+import { inject } from '../../core/registry';
 
 export default function InstitutionsApp() {
     const [activeTab, setActiveTab] = useState('inst-panel-register');
@@ -48,7 +50,6 @@ export default function InstitutionsApp() {
     useEffect(() => {
         loadInstitutions();
 
-        const navLink = document.querySelector('a[href="#manage-institutions"]');
         const handleNavClick = () => {
             resetForm();
         };
@@ -56,11 +57,11 @@ export default function InstitutionsApp() {
             loadInstitutions();
         };
 
-        if (navLink) navLink.addEventListener('click', handleNavClick);
+        const unsubNav = onNavClick('#manage-institutions', handleNavClick);
         const unsubPractices = on(EVENTS.PRACTICES_CHANGED, handlePracticesChanged);
 
         return () => {
-            if (navLink) navLink.removeEventListener('click', handleNavClick);
+            unsubNav();
             unsubPractices();
         };
     }, [loadInstitutions, resetForm]);
@@ -84,24 +85,7 @@ export default function InstitutionsApp() {
                     `.inst-entity-card[data-id="${String(id).replace(/"/g, '')}"]`
                 );
             if (!card) return;
-            const shell = document.querySelector('.app-shell');
-            const isMobile = window.innerWidth <= 900 || window.innerHeight <= 500;
-            if (isMobile && shell) {
-                const sectionEl = document.getElementById('manage-institutions');
-                const topbar = sectionEl && sectionEl.querySelector('.app-topbar');
-                const topbarHeight = topbar ? topbar.offsetHeight : 0;
-                const cardTop =
-                    card.getBoundingClientRect().top -
-                    shell.getBoundingClientRect().top +
-                    shell.scrollTop;
-                shell.scrollTo({
-                    top: Math.max(0, cardTop - topbarHeight - 24),
-                    behavior: 'smooth'
-                });
-                window.scrollTo(0, 0);
-            } else {
-                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            scrollCardIntoShellView(card, 'manage-institutions');
         }, 40);
         setTimeout(() => setHighlightId(null), 2400);
     };
@@ -131,9 +115,7 @@ export default function InstitutionsApp() {
             resetForm();
             await loadInstitutions();
             emit(EVENTS.DATA_CHANGED);
-            if (window.SPP_REPORTS && window.SPP_REPORTS.reload) {
-                window.SPP_REPORTS.reload();
-            }
+            inject('reports')?.reload?.();
             revealCard(savedId);
             await alertModal({
                 title: isEdit ? 'Institution updated' : 'Institution created',
@@ -185,9 +167,7 @@ export default function InstitutionsApp() {
             await del(`/api/institutions/${inst.id}`);
             await loadInstitutions();
             emit(EVENTS.DATA_CHANGED);
-            if (window.SPP_REPORTS && window.SPP_REPORTS.reload) {
-                window.SPP_REPORTS.reload();
-            }
+            inject('reports')?.reload?.();
             await alertModal({
                 title: 'Institution deleted',
                 message: 'The institution was deleted successfully.'

@@ -1,6 +1,12 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { session, logout, ROLES, request } from '../../core/api';
+import {
+    bindLogoutLinks,
+    updateProfileDOM,
+    syncNotificationBellBadges,
+    getNotificationBellButtons
+} from '../../core/shell';
 
 const POLL_MS = 60000;
 
@@ -41,38 +47,14 @@ export default function ProfileAndNotificationsApp() {
             logout();
         };
 
-        const logoutLinks = Array.from(document.querySelectorAll('.app-logout'));
-        logoutLinks.forEach((link) => link.addEventListener('click', handleLogout));
+        const unbindLogout = bindLogoutLinks(handleLogout);
 
         let cancelled = false;
         (async () => {
             try {
                 const user = await session();
                 if (cancelled || !user) return;
-                const fullName = ((user.firstName || '') + ' ' + (user.lastName || '')).trim();
-
-                document.querySelectorAll('.app-account strong').forEach((el) => {
-                    el.textContent = fullName;
-                });
-                document.querySelectorAll('.app-account small').forEach((el) => {
-                    el.textContent = (ROLES && ROLES[user.role]) || user.role;
-                });
-
-                const capitalize = (text) =>
-                    text ? String(text).charAt(0).toUpperCase() + String(text).slice(1) : '';
-
-                document.querySelectorAll('.profile-info-text').forEach((block) => {
-                    const labelEl = block.querySelector('.profile-info-label');
-                    const label = ((labelEl && labelEl.textContent) || '').trim().toLowerCase();
-                    const value = block.querySelector('.profile-info-value');
-                    if (!value) return;
-                    if (label.includes('name')) value.textContent = fullName;
-                    else if (label.startsWith('id'))
-                        value.textContent = (user.documentType || '') + ' ' + (user.documentNumber || '');
-                    else if (label.includes('email')) value.textContent = user.email || '';
-                    else if (label.includes('program')) value.textContent = user.program || 'Unassigned';
-                    else if (label.includes('status')) value.textContent = capitalize(user.status);
-                });
+                updateProfileDOM(user, ROLES);
             } catch (_) {
                 // Handled by session redirect if unauthorized
             }
@@ -80,28 +62,13 @@ export default function ProfileAndNotificationsApp() {
 
         return () => {
             cancelled = true;
-            logoutLinks.forEach((link) => link.removeEventListener('click', handleLogout));
+            unbindLogout();
         };
     }, []);
 
     // 2. Sync bell badge onto topbar buttons
     useEffect(() => {
-        const buttons = Array.from(document.querySelectorAll('.topbar-icon[aria-label="Notifications"]'));
-        buttons.forEach((button) => {
-            let badge = button.querySelector('.bell-badge');
-            if (!unread) {
-                if (badge) badge.remove();
-                button.removeAttribute('data-unread');
-                return;
-            }
-            if (!badge) {
-                badge = document.createElement('span');
-                badge.className = 'bell-badge';
-                button.appendChild(badge);
-            }
-            badge.textContent = unread > 99 ? '99+' : String(unread);
-            button.setAttribute('data-unread', String(unread));
-        });
+        syncNotificationBellBadges(unread);
     }, [unread]);
 
     const placePanel = useCallback((anchor) => {
@@ -151,7 +118,7 @@ export default function ProfileAndNotificationsApp() {
 
     // 3. Bind bell buttons, outside click, resize, and polling
     useEffect(() => {
-        const buttons = Array.from(document.querySelectorAll('.topbar-icon[aria-label="Notifications"]'));
+        const buttons = getNotificationBellButtons();
         if (!buttons.length) return;
 
         const syncAriaExpanded = (activeBtn, isOpen) => {

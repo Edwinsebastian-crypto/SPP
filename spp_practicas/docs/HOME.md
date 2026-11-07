@@ -13,24 +13,19 @@ sidebar menu** and the section that opens as soon as the user signs in. Data com
 | Composition root | [src/container.js](../src/container.js) (`homeService`, `controllers.home`) |
 | API mount | [src/routes/index.js](../src/routes/index.js) (`router.use('/home', ...)`) |
 | Styles | [public/css/home.css](../public/css/home.css) |
-| Panel script | [public/js/pages/home.js](../public/js/pages/home.js) |
+| React component | [frontend/src/components/home/HomeApp.jsx](../frontend/src/components/home/HomeApp.jsx) |
 | Unit test | [tests/home.service.test.js](../tests/home.service.test.js) |
 
-The `Home` link, the `#home` section (`#home-root`) and the `home.css` / `home.js` includes are added to
-`public/pages/{student,tutor,advisor,director}.html` by:
-
-```bash
-node scripts/install-home.js --check   # dry run
-node scripts/install-home.js           # idempotent; writes a .bak the first time
-```
+The `Home` link, the `#home` section (`#home-root`) and the `home.css` stylesheet are included in
+`public/pages/{student,tutor,advisor,director}.html` and mounted by each role's Vite entry in `frontend/src/entries/`.
 
 ## Landing behaviour
 
-- [public/js/core/shell.js](../public/js/core/shell.js) marks the **first menu option** as active and shows the
+- [frontend/src/core/shell.js](../frontend/src/core/shell.js) marks the **first menu option** as active and shows the
   section it points to. A panel may declare its sections in a different order than its menu, so the target is
   resolved through the link's `href`, not by document order.
 - An explicit `#hash` still wins (for example `/pages/director.html#reports`).
-- [public/js/pages/home.js](../public/js/pages/home.js) loads the data on start and refreshes it after 30 s or when
+- [frontend/src/components/home/HomeApp.jsx](../frontend/src/components/home/HomeApp.jsx) loads the data on start and refreshes it after 30 s or when
   the user comes back to Home through the sidebar.
 
 ## What each role sees

@@ -72,26 +72,35 @@ column names (`SchemaResolver`), opens the port and handles graceful shutdown.
 * **CSRF** — every state-changing request must carry the `X-SPP: 1` header.
 * **CSP** — no inline scripts or inline event handlers are used, so the policy is `script-src 'self'`.
 
-## Frontend (`public/`)
+## Frontend (`frontend/src/` → `public/dist/`)
 
-Server-rendered static HTML pages (served only after a role check) plus plain browser scripts — no build step.
+Server-guarded HTML shells (`public/pages/<role>.html`) mounted by React 19 + Vite bundles compiled into `public/dist/`.
 
 ```
+frontend/src/
+  core/                    shared ES modules (no window.SPP globals)
+      api.js               HTTP client (request, get, post, put, patch, del, getConfig, session, logout, EvalAPI)
+      events.js            typed CustomEvent bus (EVENTS, emit, on)
+      registry.js          singleton action registry (provide, inject)
+      practiceStore.js     reactive practice store (getPractice, setPractice, usePractice)
+      shell.js             sidebar / topbar / theme / navigation helpers
+      panels.js            panel visibility, transitions, scroll reset
+      modals.js            alert / confirm modal dialogs
+      custom-select.js     styled <select> enhancer + useCustomSelect hook
+      reports-kit.js       CSV / XLSX / ZIP / print exporters
+  hooks/
+      useCustomSelect.js   React hook for customSelect lifecycle
+  components/              React components grouped by domain (auth, home, practice, activities, student, tutor, director, reports, common)
+  entries/                 Vite entry points compiled to public/dist/*.js
 public/
-  index.html               login
-  pages/<role>.html        student | tutor | advisor | director  (never served statically)
-  css/                     variables → shell → <role>.css (+ users.css for the director)
-  js/core/                 shared by every page
-      api.js               HTTP client (window.SPP) — the only code that calls fetch()
-      session.js           who is logged in, log out
-      shell.js             sidebar / topbar / theme
-      panels.js            panel navigation, "..." card menus, tabs
-      credential.js        student credential modal
-      custom-select.js     styled <select> widget (director)
-  js/pages/                one file per page; `<page>.js` = UI behaviour, `<page>.api.js` = data
+  index.html               login shell
+  register.html            self-registration shell
+  pages/<role>.html        student | tutor | advisor | director  (never served statically without auth)
+  dist/                    compiled Vite bundles
+  css/                     variables → shell → <role>.css
 ```
 
-Rule: the views never talk to a database; they only call `/api/*` through `SPP.request`.
+Rule: the views never talk to a database; they only call `/api/*` through `frontend/src/core/api.js`.
 
 ## Adding a feature (checklist)
 

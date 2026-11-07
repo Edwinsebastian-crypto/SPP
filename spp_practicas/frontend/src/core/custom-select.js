@@ -233,7 +233,13 @@ export function init(rootSelector) {
 
     ensureOptionHeight();
 
-    root.querySelectorAll('.cp-input-wrap select').forEach((select) => {
+    const selects = root.tagName === 'SELECT'
+        ? [root]
+        : root.matches && root.matches('.cp-input-wrap')
+            ? root.querySelectorAll('select')
+            : root.querySelectorAll('.cp-input-wrap select');
+
+    selects.forEach((select) => {
         if (select.classList.contains('hidden-select')) return;
 
         select.classList.add('hidden-select');
@@ -329,7 +335,13 @@ export function init(rootSelector) {
 /** Puts every select of `root` back on its first option and refreshes the visual trigger. */
 export function resetIn(root) {
     if (!root) return;
-    root.querySelectorAll('.cp-input-wrap select').forEach((select) => {
+    const selects = root.tagName === 'SELECT'
+        ? [root]
+        : root.matches && root.matches('.cp-input-wrap')
+            ? root.querySelectorAll('select')
+            : root.querySelectorAll('.cp-input-wrap select');
+
+    selects.forEach((select) => {
         const trigger = select.parentElement.querySelector('.custom-select-trigger');
         const first = select.options[0];
         const chevron = select.parentElement.querySelector('.right-icon');

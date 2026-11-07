@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { get, request } from '../../core/api';
+import { getConfig, request } from '../../core/api';
 import { useCustomSelect } from '../../hooks/useCustomSelect';
 
 const ROLES = {
@@ -23,12 +23,10 @@ function stripAccents(text) {
 }
 
 export default function RegisterApp() {
-    const [institutionalDomain, setInstitutionalDomain] = useState(
-        typeof window !== 'undefined' && window.SPP_DOMAIN ? window.SPP_DOMAIN : 'udi.edu.co'
-    );
+    const [institutionalDomain, setInstitutionalDomain] = useState('udi.edu.co');
 
     useEffect(() => {
-        get('/api/config')
+        getConfig()
             .then((cfg) => {
                 if (cfg && cfg.institutionalDomain) {
                     setInstitutionalDomain(cfg.institutionalDomain);
@@ -87,7 +85,7 @@ export default function RegisterApp() {
 
     useCustomSelect(
         ['#reg-wizard-container', docTypeRef, programRef],
-        [programs, documentType, program, role, step]
+        [programs, documentType, program, role, currentStep]
     );
 
     // Auto-suggest email when firstName or lastName changes
@@ -219,7 +217,9 @@ export default function RegisterApp() {
         if (firstFocus) {
             try {
                 firstFocus.focus();
-            } catch (_) {}
+            } catch (_) {
+                /* ignore focus error */
+            }
         }
         return valid;
     };
