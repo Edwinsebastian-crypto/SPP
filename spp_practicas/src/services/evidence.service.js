@@ -62,9 +62,17 @@ class EvidenceService {
       await Promise.all(uploadedFiles.map(f => this.fileStorage.destroy(f.public_id, f.resource_type).catch(() => {})));
       throw err;
     }
-    this.auditService.record(user, { entity: AUDIT_ENTITIES.EVIDENCE, entityId: id, practiceId: practice.id, action: AUDIT_ACTIONS.INSERT });
+    const created = await this.evidenceRepository.findById(id);
+    this.auditService.record(user, {
+      entity: AUDIT_ENTITIES.EVIDENCE,
+      entityId: id,
+      practiceId: practice.id,
+      action: AUDIT_ACTIONS.INSERT,
+      after: created || { id, description, hours, activityId: activity.id, files: allFiles },
+      details: `Evidencia ${id} registrada con ${hours} horas para actividad ${activity.id}`
+    });
     await this.lifecycle.syncHours(practice.id);
-    return this.evidenceRepository.findById(id);
+    return created || this.evidenceRepository.findById(id);
   }
 
   async #loadAuthorized(user, evidenceId) {
@@ -105,9 +113,18 @@ class EvidenceService {
     }
 
     await this.evidenceRepository.update(evidence.id, description, hours);
-    this.auditService.record(user, { entity: AUDIT_ENTITIES.EVIDENCE, entityId: evidence.id, practiceId: practice.id, action: AUDIT_ACTIONS.UPDATE });
+    const updated = await this.evidenceRepository.findById(evidence.id);
+    this.auditService.record(user, {
+      entity: AUDIT_ENTITIES.EVIDENCE,
+      entityId: evidence.id,
+      practiceId: practice.id,
+      action: AUDIT_ACTIONS.UPDATE,
+      before: evidence,
+      after: updated,
+      details: `Evidencia ${evidence.id} actualizada`
+    });
     await this.lifecycle.syncHours(practice.id);
-    return this.evidenceRepository.findById(evidence.id);
+    return updated;
   }
 
   async remove(user, evidenceId) {
@@ -125,7 +142,14 @@ class EvidenceService {
           .catch((err) => console.warn('[cloudinary] destroy:', err.message));
       }
     }
-    this.auditService.record(user, { entity: AUDIT_ENTITIES.EVIDENCE, entityId: evidence.id, practiceId: practice.id, action: AUDIT_ACTIONS.DELETE });
+    this.auditService.record(user, {
+      entity: AUDIT_ENTITIES.EVIDENCE,
+      entityId: evidence.id,
+      practiceId: practice.id,
+      action: AUDIT_ACTIONS.DELETE,
+      before: evidence,
+      details: `Evidencia ${evidence.id} eliminada (${evidence.hours} horas)`
+    });
     await this.lifecycle.syncHours(practice.id);
   }
 }

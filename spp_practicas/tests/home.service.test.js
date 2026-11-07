@@ -18,7 +18,8 @@ const activities = [
   { id: 'A1', practiceId: 'PRA-1', number: 1, title: 'Activity', grade: '4.5', evidenceCount: 1, feedbackCount: 1, hours: 40, dueDate: null },
   { id: 'A2', practiceId: 'PRA-1', number: 2, title: 'Lesson plan', grade: '0', evidenceCount: 1, feedbackCount: 0, hours: 10, dueDate: '2026-11-02 08:00:00+00' },
   { id: 'A3', practiceId: 'PRA-1', number: 3, title: 'Activity', grade: null, evidenceCount: 0, feedbackCount: 0, hours: 0, dueDate: '2026-10-28 08:00:00+00' },
-  { id: 'A4', practiceId: 'PRA-1', number: 4, title: 'Activity', grade: null, evidenceCount: 1, feedbackCount: 1, hours: 5, dueDate: null }
+  { id: 'A4', practiceId: 'PRA-1', number: 4, title: 'Activity', grade: null, evidenceCount: 1, feedbackCount: 1, hours: 5, dueDate: null },
+  { id: 'A5', practiceId: 'PRA-1', number: 5, title: 'Activity', grade: null, evidenceCount: 0, feedbackCount: 0, hours: 0, dueDate: null }
 ];
 const feedbackBy = {
   A1: [{ role: 'tutor', text: 'Great', date: '2026-10-20', evidenceId: 'E1' }],
@@ -48,12 +49,15 @@ function build(overrides = {}) {
     assert.equal(h.practice.workedHours, 55);
     assert.equal(h.practice.progressPct, 55);
     assert.equal(h.practice.daysLeft, 6);
-    assert.deepEqual([h.activities.graded, h.activities.review, h.activities.pending, h.activities.completed], [1, 1, 1, 1]);
+    assert.deepEqual([h.activities.graded, h.activities.review, h.activities.pending, h.activities.completed], [1, 1, 2, 1]);
     assert.equal(h.activities.averageGrade, 4.5);
+    // Even though there are 2 pending activities, A5 is student self-created (no dueDate, generic title)
+    // so upcoming only includes tutor-proposed activities (A3)
     assert.equal(h.upcoming.length, 1);
     assert.equal(h.upcoming[0].activityId, 'A3');
     assert.equal(h.upcoming[0].overdue, true);
     assert.equal(h.recentFeedback[0].text, 'Nice');
+    assert.equal(h.recentFeedback[0].activityId, 'A4');
   });
   await test('student without practice', async () => {
     const h = await build({ practiceRepository: { list: async () => [] } }).build({ role: 'student', documentNumber: 'NONE' });

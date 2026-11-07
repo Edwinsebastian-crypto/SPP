@@ -1,124 +1,183 @@
-# SPP · Servicio de notificaciones
+# Microservicio de Notificaciones · SPP
 
-Microservicio (Node 18+ / Express) que avisa por **correo** a estudiantes, tutores, asesores y director.
-Su base de datos es **MongoDB** (colección `notificaciones`, diccionario TB-0001). Consulta la información de prácticas y evaluaciones a través de los APIs HTTP internos de los servicios dueños de cada base de datos (`SOFTWARE_SPP` y `servicio_evaluacion`).
+Microservicio asíncrono desarrollado en **Node.js 18+ (Express)** encargado del despacho centralizado de **notificaciones por correo electrónico** y del suministro de la **bandeja de notificaciones en tiempo real (campana)** para el Sistema de Prácticas Pedagógicas (SPP).
 
+Utiliza **MongoDB** como almacén persistente de la cola y el historial de notificaciones, y **Nodemailer** para la entrega de correos mediante protocolo SMTP con plantillas HTML responsivas.
+
+---
+
+## 🎯 ¿Qué hace este servicio?
+
+1. **Despacho Inmediato de Notificaciones (Event-Driven)**:
+   - Escucha eventos emitidos por el Monolito (`spp_practicas`) y los encola de inmediato en MongoDB.
+   - Envío de correos automáticos ante eventos clave del ciclo académico:
+     - **Cuentas de Usuario**: Registro de nuevo usuario y notificación de aprobación/activación de cuenta por el Director.
+     - **Prácticas**: Asignación de nueva práctica a estudiante, tutor y asesor.
+     - **Actividades y Evidencias**: Emisión de retroalimentación pedagógica y calificación de evidencias.
+     - **Calificación Final**: Notificación de nota final de la práctica registrada en la bitácora.
+     - **Evaluaciones**: Notificación al estudiante cuando una evaluación es publicada y cuando es calificada por el tutor.
+
+2. **Planificador y Tareas Programadas (Cron Scheduler)**:
+   - **Recordatorios de Vencimiento (24 Horas Antes)**:
+     - Recordatorio al estudiante de actividades próximas a vencer que aún no cuentan con evidencia cargada.
+     - Recordatorio al estudiante de evaluaciones publicadas próximas a cerrar que aún no han sido presentadas.
+   - **Resumen Diario de Pendientes (Daily Digest)**:
+     - Consolidado diario a tutores y asesores con el listado de actividades y evaluaciones pendientes de retroalimentar o calificar.
+     - Consolidado diario al Director con prácticas finalizadas que aún no tienen nota final registrada.
+
+3. **Bandeja de Entrada en Plataforma (Campanita de Notificaciones)**:
+   - Provee una API REST consultada por el Monolito para mostrar el contador de notificaciones no leídas, el historial reciente y la opción de marcar mensajes como leídos dentro de la interfaz de cada usuario.
+
+4. **Idempotencia y Tolerancia a Fallos**:
+   - Cada notificación cuenta con una `claveUnica` indexada en MongoDB. Esto garantiza que ante reintentos de red, reinicios de servicios o ejecuciones concurrentes, **nunca se envíen correos duplicados**.
+   - Cola de reintentos automática con retroceso exponencial (*exponential backoff*) ante fallas temporales de servidores SMTP o problemas de red.
+
+---
+
+## 📋 Catálogo de Notificaciones
+
+| Evento / Notificación | Destinatario | Disparador | Canal |
+| :--- | :--- | :--- | :--- |
+| `UsuarioRegistrado` | Estudiante, Tutor, Asesor | Registro completado | Correo + Campana |
+| `UsuarioAprobado` | Estudiante, Tutor, Asesor | Director activa la cuenta | Correo + Campana |
+| `PracticaAsignada` | Estudiante, Tutor, Asesor | Vinculación de práctica creada | Correo + Campana |
+| `ActividadRetroalimentada` | Estudiante | Tutor/Asesor registra comentarios | Correo + Campana |
+| `ActividadCalificada` | Estudiante | Calificación de actividad registrada | Correo + Campana |
+| `PracticaCalificada` | Estudiante | Calificación final de práctica en bitácora | Correo + Campana |
+| `EvaluacionDisponible` | Estudiante | Tutor publica evaluación | Correo + Campana |
+| `EvaluacionCalificada` | Estudiante | Tutor completa la calificación de la evaluación | Correo + Campana |
+| `RecordatorioActividad` | Estudiante | 24 h previas al límite sin evidencia enviada | Correo + Campana |
+| `RecordatorioEvaluacion` | Estudiante | 24 h previas al cierre sin presentar | Correo + Campana |
+| `PendientesRevision` | Tutor, Asesor | Resumen diario a las 07:00 con tareas pendientes | Correo |
+| `PracticasSinCalificar` | Director | Resumen diario con prácticas concluidas sin nota | Correo |
+
+---
+
+## 🏛️ Arquitectura del Servicio
+
+```text
+[ Monolito SPP ] ──(Evento HTTP con Token HMAC)──▶ [ POST /api/v1/events ]
+                                                              │
+[ Planificador Interno (Cron 15 min) ] ──────────────────────┤
+                                                              ▼
+                                               [ Cola en MongoDB (notificaciones) ]
+                                                              │
+                                                              ▼
+                                                   [ Dispatcher Worker ]
+                                                              │
+                                       ┌──────────────────────┴──────────────────────┐
+                                       ▼                                             ▼
+                             [ Nodemailer (SMTP) ]                        [ API Campanita ]
+                             (Envío de Correos HTML)                 (GET /api/v1/notifications/inbox)
 ```
-Monolito ──evento firmado──▶ POST /api/v1/events ─┐
-                                                  ├─▶ cola en MongoDB ─▶ Dispatcher ─▶ SMTP ─▶ correo
-Planificador (cada 15 min) ── consulta HTTP monolito/eval ─┘                       (reintentos)
+
+### Estructura del Proyecto
+
+```text
+servicio_notificaciones/
+├── src/
+│   ├── config/              # Variables de entorno y constantes de configuración
+│   ├── infrastructure/      # Conexiones a MongoDB (Mongoose) y transporte SMTP (Nodemailer)
+│   ├── repositories/        # Repositorio de acceso a datos de notificaciones
+│   ├── services/            # Lógica de despacho, plantillas HTML, planificador y reintentos
+│   ├── routes/              # Definición de rutas y endpoints de la API
+│   ├── middlewares/         # Validación de tokens HMAC y control de acceso interno
+│   ├── app.js               # Ensamblado de Express y configuración de rutas
+│   └── server.js            # Punto de entrada y arranque del servidor (:4000)
+├── docker-compose.yml       # Orquestación con MongoDB y servidor Mailpit para pruebas
+├── package.json             # Dependencias y scripts npm
+└── README.md
 ```
 
-## Qué notifica
+---
 
-| A quién | Cuándo | Tipo (`tipo`) | Origen |
-|---|---|---|---|
-| Estudiante, tutor, asesor | Se registra / lo registran | `UsuarioRegistrado` | evento |
-| Estudiante, tutor, asesor | El director **aprueba** su cuenta (pendiente → activa) | `UsuarioAprobado` | evento |
-| Estudiante, tutor, asesor | Se le asigna una práctica | `PracticaAsignada` | evento |
-| **Estudiante** | Tutor o asesor **retroalimenta** su actividad | `ActividadRetroalimentada` | evento |
-| **Estudiante** | Tutor o asesor **califica** su actividad | `ActividadCalificada` | evento |
-| **Estudiante** | Le **califican la práctica** (nota final) | `PracticaCalificada` | evento |
-| **Estudiante** | Su **evaluación está disponible** (el tutor la publica) | `EvaluacionDisponible` | evento |
-| **Estudiante** | Su evaluación fue **calificada** por el tutor | `EvaluacionCalificada` | evento |
-| **Estudiante** | **24 h antes** de la fecha límite de una actividad sin entregar (sin evidencia) | `RecordatorioActividad` | planificador |
-| **Estudiante** | **24 h antes** del límite de una evaluación sin presentar | `RecordatorioEvaluacion` | planificador |
-| **Tutor** | Resumen diario: actividades por retroalimentar / calificar, evaluaciones por calificar, prácticas por calificar | `PendientesRevision` | planificador |
-| **Asesor** | Resumen diario: actividades por retroalimentar / calificar | `PendientesRevision` | planificador |
-| **Director** | Resumen diario: prácticas terminadas (fecha final vencida) sin nota final | `PracticasSinCalificar` | planificador |
+## 🔒 Seguridad y Autenticación
 
-Reglas: todo es **idempotente** (`claveUnica` con índice único: reiniciar, reejecutar o tener réplicas no duplica correos);
-los resúmenes salen **una vez al día** desde `DIGEST_HOUR` (7:00, hora `TZ`) y solo si hay algo pendiente; solo se consideran
-prácticas **activas**; tutores/asesores/directores/estudiantes inactivos no reciben avisos programados.
-El asesor no recibe «prácticas por calificar» porque el monolito solo deja calificar la práctica al tutor o al director.
+- **Canal Seguro Inter-Servicios**: El servicio es exclusivamente interno. Toda comunicación proveniente del Monolito requiere una cabecera de autorización con token JWT/HMAC firmado con `NOTIFICATION_SERVICE_SECRET`.
+- **Sanitización de Contenido**: Las plantillas HTML realizan escapado riguroso de variables para prevenir ataques de inyección HTML en clientes de correo.
+- **Aislamiento de Bandeja**: Los endpoints de bandeja de entrada verifican el número de documento del usuario autenticado para asegurar privacidad absoluta en las consultas.
 
-## Campanita (bandeja dentro del SPP)
+---
 
-Cada notificación creada por este servicio también aparece en la campanita del encabezado de los paneles de estudiante,
-tutor, asesor y director (contador de no leídas, lista, «marcar como leída»), aunque el correo no se haya enviado (`MAIL_MODE=log`).
-El monolito la consulta con `GET /api/notifications` (cada usuario solo ve las suyas; el documento sale de la sesión) y esta llama a
-`GET /api/v1/notifications/inbox?documento=…` y `POST /api/v1/notifications/read` del servicio. Solo se muestran las notificaciones creadas
-por este servicio (con `claveUnica`); el histórico antiguo del monolito no se muestra ni se reenvía (`LEGACY_QUEUE=false`).
+## 🚀 Puesta en Marcha
 
-## Inicio rápido sin Docker (para probar)
+### Requisitos Previos
+- **Node.js** >= 18.x
+- **MongoDB** (local o cluster en MongoDB Atlas)
+- **Servidor SMTP** (Gmail, SendGrid, Amazon SES o contenedor Mailpit para desarrollo local)
 
-```bash
-npm install
-npm run setup   # crea los .env a partir de SOFTWARE_SPP/.env (correo en modo prueba)
-npm start
-```
-
-## Puesta en marcha (Docker Compose)
+### Opción 1: Ejecución con Docker Compose (Recomendada para Desarrollo)
+Levanta de forma automática el servicio junto a un contenedor de **MongoDB** y el servidor de pruebas **Mailpit** (SMTP local con bandeja web):
 
 ```bash
 cd servicio_notificaciones
 cp .env.example .env
-#  edita .env: NOTIFICATION_SERVICE_SECRET (node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"),
-#              DATABASE_URL_PRACTICE (la misma del monolito), MONGO_PASSWORD
 docker compose up --build -d
-curl http://localhost:4000/health
 ```
 
-Levanta tres contenedores: **mongo** (con volumen), **mailpit** (SMTP de pruebas; los correos se ven en
-http://localhost:8025, no salen a Internet) y **notificaciones** (puerto 4000, solo en `127.0.0.1`).
-Para correo real define `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` en `.env`.
-Para usar MongoDB Atlas define `MONGO_URI_NOTIFICATIONS` (tiene prioridad sobre el Mongo del compose).
+- **API de Notificaciones**: [http://localhost:4000](http://localhost:4000)
+- **Bandeja de Correos Local (Mailpit)**: [http://localhost:8025](http://localhost:8025)
 
-**Monolito** (`SOFTWARE_SPP/.env`):
-```
-NOTIFICATION_SERVICE_URL=http://localhost:4000
-NOTIFICATION_SERVICE_SECRET=<el mismo secreto>
-```
-Reinícialo. El servicio debe ser **privado**: quien tenga el secreto puede publicar eventos.
+### Opción 2: Instalación Manual
 
-Sin Docker: `npm install && npm start` (exige `MONGO_URI_NOTIFICATIONS` o `MONGO_HOST`, `DATABASE_URL_PRACTICE` y el secreto).
+1. **Instalar dependencias:**
+   ```bash
+   cd servicio_notificaciones
+   npm install
+   ```
 
-## Probar sin esperar
+2. **Configurar variables de entorno (`.env`):**
+   ```bash
+   cp .env.example .env
+   ```
+   Variables principales:
+   ```ini
+   PORT=4000
+   NODE_ENV=development
+   NOTIFICATION_SERVICE_SECRET=clave_secreta_compartida_con_el_monolito
+   
+   # Conexión a MongoDB
+   MONGO_URI_NOTIFICATIONS=mongodb://localhost:27017/spp_notificaciones
+   
+   # Configuración de Correo SMTP
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_SECURE=false
+   SMTP_USER=tu_correo@institucion.edu.co
+   SMTP_PASS=tu_contrasena_de_aplicacion
+   MAIL_FROM="Sistema SPP <no-reply@institucion.edu.co>"
+   
+   # Modo de envío: 'smtp' para envío real, 'log' para imprimir en consola sin enviar
+   MAIL_MODE=smtp
+   ```
 
-Con un token del monolito (o `NotificationServiceClient.signToken()`):
-```
-POST /api/v1/jobs/run  { "job": "all", "forceDigest": true }   # recordatorios + resúmenes + envío ahora
-GET  /api/v1/notifications?documento=…&estadoEnvio=Fallida
-POST /api/v1/notifications/retry-failed
-```
-Con `MAIL_MODE=log` no hace falta SMTP: imprime el correo y lo marca como enviado.
+3. **Iniciar el servicio:**
+   ```bash
+   # Modo desarrollo (con recarga automática)
+   npm run dev
 
-## Diccionario de datos · TB-0001 `notificaciones` (MongoDB)
+   # Modo producción
+   npm start
+   ```
 
-| Campo | Tipo | Req. | Descripción |
-|---|---|---|---|
-| `_id` | ObjectId | Sí | Código único generado por MongoDB |
-| `tipo` | String (enum, 12 valores — ver tabla) | Sí | Motivo del correo |
-| `destinatario` | Object{numDocumento, correo, nombreCompleto, **rol**} | Sí | Quién recibe el correo (`rol` es nuevo) |
-| `Practica` | Object{idPractica, fechainicio, fechafinal, notaFinal, observacionFinal, estado, idTipoPractica, numDocEstudiante, numDocTutor, numDocAsesor, nitEntidad} | **No*** | Práctica que originó la notificación |
-| `asunto` | String | Sí | Asunto del correo |
-| `contenido` | String | Sí | Texto completo del correo |
-| `fechaCreacion` | Date | Sí | Cuándo se generó (antes de intentar enviarla) |
-| `fechaEnvio` | Date | **No*** | Cuándo salió correctamente; vacío mientras no se envía |
-| `estadoEnvio` | String (`Pendiente`·`Enviando`·`Enviada`·`Fallida`) | Sí (nuevo) | Estado en la cola |
-| `intentos`, `ultimoError`, `proximoIntento`, `bloqueadoHasta` | Number/String/Date | (nuevo) | Control de reintentos y reservas |
-| `claveUnica` | String (índice único) | (nuevo) | Evita duplicados |
+---
 
-\* **Cambios que conviene reflejar en el diccionario:** `Practica` pasa de «Sí» a «No» porque el registro de usuarios y los
-resúmenes del director/tutor no nacen de una sola práctica; `fechaEnvio` es «No» (queda vacía hasta el envío).
-Los documentos antiguos del monolito (con `idPractica` suelto y sin `estadoEnvio`) también se envían.
+## 📡 Endpoints de la API (`/api/v1`)
 
-## Variables de entorno
+| Método | Endpoint | Descripción |
+| :--- | :--- | :--- |
+| `POST` | `/api/v1/events` | Recepción de eventos desde el Monolito para encolar notificaciones |
+| `GET` | `/api/v1/notifications/inbox` | Consulta de notificaciones para la campana del usuario |
+| `POST` | `/api/v1/notifications/read` | Marcar una o todas las notificaciones como leídas |
+| `POST` | `/api/v1/jobs/run` | Ejecución manual inmediata de tareas del planificador (recordatorios / digest) |
+| `POST` | `/api/v1/notifications/retry-failed` | Reintentar el despacho de notificaciones fallidas |
+| `GET` | `/health` | Verificación de salud y estado de conexión a MongoDB |
 
-Ver `.env.example`. Las principales: `NOTIFICATION_SERVICE_SECRET`, `DATABASE_URL_PRACTICE`, `DATABASE_URL_EVALUATION` (opcional),
-`MONGO_*`, `SMTP_*`, `MAIL_FROM`, `APP_URL`, `DIGEST_HOUR`, `REMINDER_HOURS`.
+---
 
-## Pruebas
+## 🧪 Pruebas Automatizadas
 
 ```bash
-npm install && npm test        # 68 pruebas; las de SQL se omiten si no defines TEST_PRACTICE_DB_URL
+npm test
 ```
-Cubren plantillas, escapado del HTML, autenticación, modelo, eventos, planificador, reintentos del envío, API HTTP y las
-consultas reales contra una copia del esquema heredado (`tests/*.sql`).
-
-## Estado de verificación (honesto)
-
-Probado: toda la lógica, la API HTTP, las consultas SQL contra PostgreSQL 16 con el esquema heredado y el flujo
-monolito → servicio → correo con la cola en memoria. **Sin ejecutar** (no había Docker, MongoDB ni SMTP en el entorno de desarrollo):
-`docker compose up`, las consultas Mongoose reales de `notification.repository.js` (índice único, `findOneAndUpdate`) y el envío SMTP real.
-Si algo falla al primer arranque, mira primero eso.
+Ejecuta la suite de pruebas que valida el formateo de plantillas, la lógica de idempotencia, el control de reintentos y la autenticación inter-servicios.

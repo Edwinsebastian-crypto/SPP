@@ -248,6 +248,7 @@ export const EvalAPI = {
     director: {
         resumen: () => evalReq('GET', '/director/resumen'),
         listar: (q) => evalReq('GET', '/director/evaluaciones', undefined, q),
+        listarEvaluaciones: (q) => evalReq('GET', '/director/evaluaciones', undefined, q),
         detalle: (id) => evalReq('GET', `/director/evaluaciones/${id}`),
         obtenerEvaluacion: (id) => evalReq('GET', `/director/evaluaciones/${id}/preguntas`),
         listarIntentos: (idEval) => evalReq('GET', `/director/evaluaciones/${idEval}/intentos`),

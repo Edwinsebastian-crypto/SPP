@@ -286,8 +286,25 @@ export default function TutorEvaluationApp() {
         };
     }, [cargarLista, resolverPractica, switchView]);
 
+    const isPracticeReadOnly = () => {
+        const actualPractice = getPractice().practice;
+        if (!actualPractice) return false;
+        const st = String(actualPractice.status || '').toLowerCase();
+        return (
+            st === 'completed' ||
+            st === 'finalizada' ||
+            st === 'cancelled' ||
+            st === 'cancelada'
+        );
+    };
+
     const editable = (ev) =>
-        Boolean(ev && ev.estado !== 'CERRADA' && ev.intentos_presentados === 0);
+        Boolean(
+            !isPracticeReadOnly() &&
+            ev &&
+            ev.estado !== 'CERRADA' &&
+            ev.intentos_presentados === 0
+        );
 
     const handlePublicar = async () => {
         if (!evActual) return;
@@ -681,17 +698,19 @@ export default function TutorEvaluationApp() {
                                 {contextText}
                             </p>
                         </div>
-                        <button
-                            type="button"
-                            className="ev-btn ev-btn--primary"
-                            id="btn-nueva"
-                            onClick={() =>
-                                setEvalModalState({ open: true, ev: null })
-                            }
-                        >
-                            <Icon name="fa-solid fa-plus" />
-                            New evaluation
-                        </button>
+                        {!isPracticeReadOnly() && (
+                            <button
+                                type="button"
+                                className="ev-btn ev-btn--primary"
+                                id="btn-nueva"
+                                onClick={() =>
+                                    setEvalModalState({ open: true, ev: null })
+                                }
+                            >
+                                <Icon name="fa-solid fa-plus" />
+                                New evaluation
+                            </button>
+                        )}
                     </div>
                     <div className="ev-stack" id="lista-contenido">
                         {loadingLista ? (

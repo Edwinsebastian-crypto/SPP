@@ -750,6 +750,16 @@ body.dark-theme .lb-info-value {
   transform: translateX(3px);
 }
 
+.ev-item--cancel {
+  color: #b93232;
+}
+
+.ev-item--cancel:hover {
+  background: rgba(185, 50, 50, 0.12);
+  color: #8b2424;
+  transform: translateX(3px);
+}
+
 /* Modo oscuro para evidencias */
 body.dark-theme #evidences-panel .ev-card {
   background: #D1E5DE;
@@ -3004,6 +3014,16 @@ body.dark-theme .lb-info-value {
 
 .ev-item--delete:hover {
   background: rgba(185, 50, 50, 0.1);
+  color: #8b2424;
+  transform: translateX(3px);
+}
+
+.ev-item--cancel {
+  color: #b93232;
+}
+
+.ev-item--cancel:hover {
+  background: rgba(185, 50, 50, 0.12);
   color: #8b2424;
   transform: translateX(3px);
 }

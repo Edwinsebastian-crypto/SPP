@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { get, session, ROLES, formatDate as apiFormatDate, formatActivityDate as apiFormatActivityDate } from '../../core/api';
-import { showPanel, selectPracticeById, triggerPracticeEnter } from '../../core/panels';
+import { get, session, ROLES, formatDate as apiFormatDate, formatActivityDate as apiFormatActivityDate, EvalAPI } from '../../core/api';
+import { showPanel, selectPracticeById } from '../../core/panels';
+import { inject } from '../../core/registry';
 import { activateNav, onNavClick } from '../../core/shell';
 import { EVENTS, emit, on } from '../../core/events';
 
@@ -91,7 +92,18 @@ function HmHero({ user, text, actions, ringNode, onAction }) {
                             key={idx}
                             type="button"
                             className={`hm-btn hm-btn--${a.ghost ? 'ghost' : 'gold'}`}
-                            onClick={() => onAction(a)}
+                            onClick={() => (!a.disabled ? onAction(a) : null)}
+                            disabled={a.disabled}
+                            style={
+                                a.disabled
+                                    ? {
+                                          opacity: 0.6,
+                                          cursor: 'not-allowed',
+                                          filter: 'grayscale(0.6)'
+                                      }
+                                    : undefined
+                            }
+                            title={a.title || undefined}
                         >
                             <i className={`fa-solid ${a.icon}`} aria-hidden="true"></i>
                             {a.label}
@@ -230,11 +242,101 @@ function HmStack({ parts }) {
     );
 }
 
+
+function computeTutorPendingEvaluations(practices, evaluations) {
+    const pList = practices || [];
+    const eList = evaluations || [];
+    const items = [];
+    const seenPractices = new Set();
+
+    // 1. Evaluaciones con respuesta pendiente de calificar
+    for (const ev of eList) {
+        const enviados = Number(ev.intentos_enviados) || 0;
+        const calificados = Number(ev.intentos_calificados) || 0;
+        const pendientes = Number(ev.pendientes_revision) || 0;
+        const hasSubmitted = pendientes > 0 || enviados > calificados || ev.estado === 'ENVIADO';
+
+        if (hasSubmitted) {
+            const pid = String(ev.id_practica || '').trim();
+            const matchedPractice = pList.find(
+                (p) => String(p.id).trim() === pid || String(p.code).trim() === pid
+            );
+            const studentName = ev.estudiante || matchedPractice?.student || 'Student';
+            if (pid) seenPractices.add(pid);
+
+            items.push({
+                key: `eval-${ev.id_evaluacion}`,
+                practiceId: pid || matchedPractice?.id,
+                title: ev.titulo || 'Evaluation response',
+                meta: `${studentName} · Response submitted · Needs grading`,
+                tone: 'warn',
+                pillText: 'Grade',
+                pillTone: 'warn',
+                icon: 'fa-file-signature'
+            });
+        }
+    }
+
+    // 2. Prácticas que terminan sus horas y pasan al estado de evaluar
+    for (const p of pList) {
+        const rawStatus = String(p.status || '').toLowerCase();
+        const isOpen = rawStatus !== 'completed' && rawStatus !== 'finalizada' && rawStatus !== 'cancelled' && rawStatus !== 'cancelada';
+        if (!isOpen) continue;
+
+        const isReadyToEval = rawStatus === 'evaluating' || rawStatus === 'evaluando' || (p.requiredHours > 0 && p.workedHours >= p.requiredHours);
+        if (isReadyToEval) {
+            const pid = String(p.id || '').trim();
+            seenPractices.add(pid);
+            items.push({
+                key: `ready-${p.id}`,
+                practiceId: p.id,
+                title: 'Hours completed · Ready to evaluate',
+                meta: `${p.student} · ${p.workedHours}/${p.requiredHours} h completed`,
+                tone: 'ok',
+                pillText: 'Evaluate',
+                pillTone: 'ok',
+                icon: 'fa-user-check'
+            });
+        }
+    }
+
+    // 3. Prácticas cuya fecha límite expira en 5 días y no tienen evaluación
+    for (const p of pList) {
+        const rawStatus = String(p.status || '').toLowerCase();
+        const isOpen = rawStatus !== 'completed' && rawStatus !== 'finalizada' && rawStatus !== 'cancelled' && rawStatus !== 'cancelada';
+        if (!isOpen) continue;
+
+        const pid = String(p.id || '').trim();
+        const isExpiringSoon = p.daysLeft != null && p.daysLeft <= 5;
+        if (isExpiringSoon) {
+            const hasAnyEvaluation = eList.some(
+                (ev) => String(ev.id_practica || '').trim() === pid
+            );
+            if (!hasAnyEvaluation && !seenPractices.has(pid)) {
+                items.push({
+                    key: `no-eval-${p.id}`,
+                    practiceId: p.id,
+                    title: 'No evaluation created',
+                    meta: `${p.student} · ${p.daysLeft < 0 ? 'Deadline expired' : p.daysLeft === 0 ? 'Deadline today' : `Expires in ${p.daysLeft} days`} · Needs evaluation`,
+                    tone: 'danger',
+                    pillText: p.daysLeft <= 0 ? 'Urgent' : `${p.daysLeft}d left`,
+                    pillTone: 'danger',
+                    icon: 'fa-triangle-exclamation'
+                });
+            }
+        }
+    }
+
+    return items;
+}
+
 export default function HomeApp() {
     const [user, setUser] = useState(null);
     const [homeData, setHomeData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [tutorEvaluations, setTutorEvaluations] = useState([]);
+    const [studentEvaluations, setStudentEvaluations] = useState([]);
 
     const lastLoadRef = useRef(0);
     const loadingRef = useRef(false);
@@ -254,11 +356,32 @@ export default function HomeApp() {
     }, [go]);
 
     const openActivityFromHome = useCallback(
-        (practiceId, activityId) => {
+        (practiceId, activityId, activityTitle) => {
             go('#practice');
             selectPracticeById(practiceId);
-            showPanel('evidences-panel', 'flex');
-            emit(EVENTS.OPEN_ACTIVITY, { practiceId, activityId });
+            const r = userRef.current?.role;
+            showPanel('evidences-panel', r === 'student' ? 'block' : 'flex');
+            emit(EVENTS.OPEN_ACTIVITY, { practiceId, activityId, title: activityTitle });
+            window.scrollTo(0, 0);
+        },
+        [go]
+    );
+
+    const openQuestionsFromHome = useCallback(
+        (practiceId) => {
+            go('#practice');
+            selectPracticeById(practiceId);
+            showPanel('questions-panel', 'flex');
+            setTimeout(() => {
+                const r = userRef.current?.role;
+                if (r === 'student') {
+                    inject('eval:student')?.abrir?.();
+                } else if (r === 'tutor') {
+                    inject('eval:tutor')?.abrir?.();
+                } else if (r === 'director') {
+                    inject('eval:director')?.abrir?.();
+                }
+            }, 60);
             window.scrollTo(0, 0);
         },
         [go]
@@ -266,6 +389,16 @@ export default function HomeApp() {
 
     const openUploadEvidence = useCallback(
         (practiceId) => {
+            const currentP = homeDataRef.current?.practice;
+            if (
+                currentP &&
+                (currentP.status === 'completed' ||
+                    currentP.status === 'finalizada' ||
+                    currentP.status === 'cancelled' ||
+                    currentP.status === 'cancelada')
+            ) {
+                return;
+            }
             go('#practice');
             selectPracticeById(practiceId);
             showPanel('activities-panel', 'flex');
@@ -277,10 +410,6 @@ export default function HomeApp() {
         },
         [go]
     );
-
-    const enterPractice = useCallback(() => {
-        triggerPracticeEnter();
-    }, []);
 
     const openPractice = useCallback(
         (id) => {
@@ -296,9 +425,10 @@ export default function HomeApp() {
             }
             go('#practice');
             selectPracticeById(id);
-            enterPractice();
+            showPanel('logbook-panel', 'flex');
+            window.scrollTo(0, 0);
         },
-        [go, enterPractice]
+        [go]
     );
 
     const openUsersList = useCallback(() => {
@@ -346,6 +476,34 @@ export default function HomeApp() {
             const { home } = await get('/api/home');
             homeDataRef.current = home;
             setHomeData(home);
+
+            const activeUser = userRef.current;
+            if (activeUser?.role === 'tutor' || home?.role === 'tutor') {
+                try {
+                    if (EvalAPI?.tutor?.listarEvaluaciones) {
+                        const evRes = await EvalAPI.tutor.listarEvaluaciones();
+                        const evList = Array.isArray(evRes) ? evRes : evRes?.items || [];
+                        setTutorEvaluations(evList);
+                    }
+                } catch (_) { /* ignore */ }
+            } else if (activeUser?.role === 'student' || home?.role === 'student') {
+                try {
+                    if (EvalAPI?.estudiante?.misEvaluaciones) {
+                        const evRes = await EvalAPI.estudiante.misEvaluaciones();
+                        let evList = Array.isArray(evRes) ? evRes : evRes?.items || [];
+                        const currentPid = String(home?.practice?.id || home?.practice?.code || '').trim();
+                        if (currentPid) {
+                            evList = evList.filter(
+                                (ev) => String(ev.id_practica || '').trim() === currentPid
+                            );
+                        } else {
+                            evList = [];
+                        }
+                        setStudentEvaluations(evList);
+                    }
+                } catch (_) { /* ignore */ }
+            }
+
             lastLoadRef.current = Date.now();
         } catch (err) {
             setError(err || new Error('Please try again.'));
@@ -398,7 +556,7 @@ export default function HomeApp() {
                     trailNode={<span className={`hm-pill hm-pill--${pillTone}`}>{pillText}</span>}
                     onClick={() =>
                         d.activityId
-                            ? openActivityFromHome(d.practiceId, d.activityId)
+                            ? openActivityFromHome(d.practiceId, d.activityId, d.title)
                             : openPractice(d.practiceId)
                     }
                 />
@@ -428,21 +586,19 @@ export default function HomeApp() {
         }
 
         const a = d.activities || {};
-        const timeLeft =
-            p.daysLeft == null
-                ? '—'
-                : p.daysLeft < 0
-                ? 'Ended ' + plural(-p.daysLeft, 'day', 'days') + ' ago'
-                : plural(p.daysLeft, 'day', 'days') + ' left';
-
-        const factsList = [
-            ['Institution', p.institution || '—'],
-            ['Practice', p.name || '—'],
-            ['Tutor', p.tutor || '—'],
-            ['Advisor', p.advisor || '—'],
-            ['Period', `${formatDate(p.startDate)} – ${formatDate(p.endDate)}`],
-            ['Time left', timeLeft]
-        ];
+        const isPracticeClosed =
+            p.status === 'completed' ||
+            p.status === 'finalizada' ||
+            p.status === 'cancelled' ||
+            p.status === 'cancelada';
+        const hoursCompleted =
+            (p.workedHours != null &&
+                p.requiredHours != null &&
+                p.workedHours >= p.requiredHours) ||
+            p.progressPct >= 100 ||
+            p.status === 'evaluating' ||
+            p.status === 'grading' ||
+            p.status === 'completed';
 
         return (
             <>
@@ -450,12 +606,23 @@ export default function HomeApp() {
                     user={user}
                     text=""
                     actions={[
-                        {
-                            label: 'Upload evidence',
-                            icon: 'fa-cloud-arrow-up',
-                            uploadEvidence: true,
-                            open: p.id
-                        }
+                        isPracticeClosed
+                            ? {
+                                  label:
+                                      p.status === 'cancelled' ||
+                                      p.status === 'cancelada'
+                                          ? 'Practice cancelled'
+                                          : 'Practice completed',
+                                  icon: 'fa-lock',
+                                  disabled: true,
+                                  title: 'Practice is in read-only mode'
+                              }
+                            : {
+                                  label: 'Upload evidence',
+                                  icon: 'fa-cloud-arrow-up',
+                                  uploadEvidence: true,
+                                  open: p.id
+                              }
                     ]}
                     ringNode={
                         <HmRing
@@ -515,57 +682,218 @@ export default function HomeApp() {
                 </div>
                 <div className="hm-grid">
                     <div className="hm-col">
-                        <HmCard title="My practice" icon="fa-book-open" count={null}>
-                            <dl className="hm-facts">
-                                {factsList.map(([t, v]) => (
-                                    <div key={t}>
-                                        <dt>{t}</dt>
-                                        <dd>{v}</dd>
+                        <HmCard
+                            title="Questions & Evaluations notices"
+                            icon="fa-clipboard-question"
+                            count={
+                                studentEvaluations.length
+                                    ? `${studentEvaluations.length} evaluation${
+                                          studentEvaluations.length > 1 ? 's' : ''
+                                      }`
+                                    : null
+                            }
+                        >
+                            {/* Congratulations / Hours status */}
+                            {hoursCompleted ? (
+                                <div className="hm-eval-congrats">
+                                    <div className="hm-eval-congrats-icon">
+                                        <i className="fa-solid fa-trophy" aria-hidden="true" />
                                     </div>
-                                ))}
-                            </dl>
-                            <div className="hm-progress-head">
-                                <span>Hours progress</span>
-                                <span>{p.progressPct}%</span>
-                            </div>
-                            <div
-                                className="hm-bar"
-                                role="progressbar"
-                                aria-valuenow={p.progressPct}
-                                aria-valuemin="0"
-                                aria-valuemax="100"
-                            >
-                                <span style={{ width: `${p.progressPct}%` }}></span>
-                            </div>
-                            <div className="hm-actions" style={{ marginTop: '18px' }}>
-                                <button
-                                    type="button"
-                                    className="hm-btn hm-btn--solid"
-                                    onClick={() => openPractice(p.id)}
+                                    <div style={{ flex: 1 }}>
+                                        <div className="hm-eval-congrats-title">
+                                            🎉 ¡Felicitaciones! Has completado el 100% de tus horas
+                                        </div>
+                                        <div className="hm-eval-congrats-text">
+                                            Has registrado{' '}
+                                            <strong>
+                                                {p.workedHours} de {p.requiredHours} h
+                                            </strong>{' '}
+                                            requeridas. Se le ha notificado a tu tutor académico (
+                                            <strong>{p.tutor || 'Tutor'}</strong>) que terminaste
+                                            tus horas y es momento de evaluar tu práctica.
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="hm-eval-progress">
+                                    <i
+                                        className="fa-solid fa-clock"
+                                        aria-hidden="true"
+                                    />
+                                    <span>
+                                        Llevas{' '}
+                                        <strong>
+                                            {p.workedHours} de {p.requiredHours} horas
+                                        </strong>{' '}
+                                        ({p.progressPct}%). Al completar el 100%, tu tutor será
+                                        notificado para evaluar tu práctica.
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Evaluations list */}
+                            {studentEvaluations.length > 0 ? (
+                                <div
+                                    className={
+                                        studentEvaluations.length > 6
+                                            ? 'hm-scroll-10'
+                                            : ''
+                                    }
+                                    style={
+                                        studentEvaluations.length > 6
+                                            ? {
+                                                  maxHeight: '420px',
+                                                  overflowY: 'auto',
+                                                  overflowX: 'hidden'
+                                              }
+                                            : { overflowX: 'hidden' }
+                                    }
+                                >
+                                    <ul className="hm-list" style={{ overflowX: 'hidden' }}>
+                                        {studentEvaluations.map((ev) => {
+                                            const abierto = ev.id_intento_abierto != null;
+                                            const calificada =
+                                                ev.nota_final != null ||
+                                                ev.ultimo_intento_nota != null ||
+                                                ev.ultimo_intento_estado === 'CALIFICADO';
+                                            const enviada =
+                                                ev.ultimo_intento_estado === 'ENVIADO';
+                                            const gradeVal = Number(
+                                                ev.nota_final ?? ev.ultimo_intento_nota
+                                            );
+                                            const gradeText =
+                                                Number.isFinite(gradeVal) && gradeVal > 0
+                                                    ? gradeVal.toFixed(1)
+                                                    : null;
+
+                                            let icon = 'fa-clipboard-question';
+                                            let tone = '';
+                                            let pillText = 'Available';
+                                            let pillTone = 'info';
+
+                                            if (abierto) {
+                                                icon = 'fa-play';
+                                                tone = 'warn';
+                                                pillText = 'In progress';
+                                                pillTone = 'warn';
+                                            } else if (calificada) {
+                                                icon = 'fa-star';
+                                                tone = gradeVal >= 3.0 ? '' : 'danger';
+                                                pillText = gradeText
+                                                    ? `Grade: ${gradeText} / 5.0`
+                                                    : 'Graded';
+                                                pillTone = gradeVal >= 3.0 ? 'info' : 'danger';
+                                            } else if (enviada) {
+                                                icon = 'fa-hourglass-half';
+                                                pillText = 'Submitted';
+                                                pillTone = 'muted';
+                                            } else if (ev.puede_intentar) {
+                                                icon = 'fa-pencil';
+                                                pillText =
+                                                    ev.intentos_usados > 0
+                                                        ? 'New attempt'
+                                                        : 'Start';
+                                                pillTone = 'info';
+                                            } else if (ev.estado === 'CERRADA') {
+                                                icon = 'fa-lock';
+                                                pillText = 'Closed';
+                                                pillTone = 'muted';
+                                            }
+
+                                            const metaParts = [];
+                                            if (ev.total_preguntas) {
+                                                metaParts.push(`${ev.total_preguntas} questions`);
+                                            }
+                                            if (ev.intentos_permitidos) {
+                                                metaParts.push(
+                                                    `${ev.intentos_usados || 0}/${
+                                                        ev.intentos_permitidos
+                                                    } attempts`
+                                                );
+                                            }
+                                            if (ev.fecha_limite) {
+                                                metaParts.push(
+                                                    `Deadline: ${formatActivityDate(
+                                                        ev.fecha_limite
+                                                    )}`
+                                                );
+                                            }
+                                            if (calificada) {
+                                                metaParts.push('Feedback available');
+                                            }
+
+                                            return (
+                                                <HmRow
+                                                    key={ev.id_evaluacion}
+                                                    icon={icon}
+                                                    tone={tone}
+                                                    title={ev.titulo || 'Practice Evaluation'}
+                                                    meta={metaParts.join(' · ')}
+                                                    trailNode={
+                                                        <span
+                                                            className={`hm-pill hm-pill--${pillTone}`}
+                                                        >
+                                                            {pillText}
+                                                        </span>
+                                                    }
+                                                    onClick={() => openQuestionsFromHome(p.id)}
+                                                />
+                                            );
+                                        })}
+                                    </ul>
+                                </div>
+                            ) : (
+                                <div
+                                    style={{
+                                        textAlign: 'center',
+                                        padding: '16px 12px',
+                                        color: '#64748b',
+                                        fontSize: '0.85rem'
+                                    }}
                                 >
                                     <i
-                                        className="fa-solid fa-right-to-bracket"
-                                        aria-hidden="true"
-                                    ></i>
-                                    Open my practice
-                                </button>
-                            </div>
-                        </HmCard>
-                        <HmCard
-                            title="Upcoming deadlines"
-                            icon="fa-calendar-days"
-                            count={(d.upcoming && d.upcoming.length) || null}
-                        >
-                            {d.upcoming && d.upcoming.length ? (
-                                <ul className="hm-list">{renderDeadlineRows(d.upcoming, false)}</ul>
-                            ) : (
-                                <HmEmpty
-                                    icon="fa-circle-check"
-                                    title="No pending deadlines"
-                                    text="Activities assigned by your tutor will appear here."
-                                />
+                                        className="fa-solid fa-clipboard-check"
+                                        style={{
+                                            fontSize: '1.5rem',
+                                            color: '#cbd5e1',
+                                            marginBottom: '8px',
+                                            display: 'block'
+                                        }}
+                                    />
+                                    No active evaluations assigned yet. Once your tutor publishes an evaluation, it will appear here.
+                                </div>
                             )}
                         </HmCard>
+                        {(() => {
+                            const tutorUpcoming = (d.upcoming || []).filter(
+                                (item) =>
+                                    !(
+                                        !item.dueDate &&
+                                        (!item.title ||
+                                            item.title.toLowerCase() === 'activity' ||
+                                            /^activity\s*#?\d+$/i.test(item.title))
+                                    )
+                            );
+                            return (
+                                <HmCard
+                                    title="Upcoming deadlines"
+                                    icon="fa-calendar-days"
+                                    count={tutorUpcoming.length || null}
+                                >
+                                    {tutorUpcoming.length ? (
+                                        <ul className="hm-list">
+                                            {renderDeadlineRows(tutorUpcoming, false)}
+                                        </ul>
+                                    ) : (
+                                        <HmEmpty
+                                            icon="fa-circle-check"
+                                            title="No pending deadlines"
+                                            text="Activities assigned by your tutor will appear here."
+                                        />
+                                    )}
+                                </HmCard>
+                            );
+                        })()}
                     </div>
                     <div className="hm-col">
                         <HmCard
@@ -598,6 +926,15 @@ export default function HomeApp() {
                                                 f.date
                                             )}`}
                                             text={f.text}
+                                            onClick={() => {
+                                                if (f.activityId) {
+                                                    openActivityFromHome(
+                                                        p.id,
+                                                        f.activityId,
+                                                        f.activityTitle
+                                                    );
+                                                }
+                                            }}
                                         />
                                     ))}
                                 </ul>
@@ -637,7 +974,7 @@ export default function HomeApp() {
                     }
                     onAction={handleActionButton}
                 />
-                <div className="hm-kpis">
+                <div className="hm-kpis hm-kpis--3">
                     <HmKpi
                         icon="fa-user-graduate"
                         tone=""
@@ -659,13 +996,6 @@ export default function HomeApp() {
                                 ? 'Evidence without your comment'
                                 : 'You are up to date'
                         }
-                    />
-                    <HmKpi
-                        icon="fa-triangle-exclamation"
-                        tone={t.overdue ? 'red' : ''}
-                        valueNode={num(t.overdue)}
-                        label="Overdue tasks"
-                        hint="Students late with evidence"
                     />
                     <HmKpi
                         icon="fa-clock"
@@ -709,7 +1039,8 @@ export default function HomeApp() {
                                                     onClick={() =>
                                                         openActivityFromHome(
                                                             q.practiceId,
-                                                            q.activityId
+                                                            q.activityId,
+                                                            q.title
                                                         )
                                                     }
                                                 />
@@ -730,21 +1061,57 @@ export default function HomeApp() {
                                 />
                             )}
                         </HmCard>
-                        <HmCard
-                            title="Upcoming deadlines"
-                            icon="fa-calendar-days"
-                            count={(d.upcoming && d.upcoming.length) || null}
-                        >
-                            {d.upcoming && d.upcoming.length ? (
-                                <ul className="hm-list">{renderDeadlineRows(d.upcoming, true)}</ul>
-                            ) : (
-                                <HmEmpty
-                                    icon="fa-calendar-check"
-                                    title="No upcoming deadlines"
-                                    text="Activities with a due date will appear here."
-                                />
-                            )}
-                        </HmCard>
+                        {(() => {
+                            if (user?.role === 'advisor') return null;
+                            const pendingEvals = computeTutorPendingEvaluations(
+                                practices,
+                                tutorEvaluations
+                            );
+                            return (
+                                <HmCard
+                                    title="Evaluations & Actions"
+                                    icon="fa-clipboard-check"
+                                    count={pendingEvals.length || null}
+                                >
+                                    {pendingEvals.length ? (
+                                        <div
+                                            className="hm-scroll-10"
+                                            style={{ maxHeight: '380px', overflowY: 'auto' }}
+                                        >
+                                            <ul className="hm-list">
+                                                {pendingEvals.map((item) => (
+                                                    <HmRow
+                                                        key={item.key}
+                                                        icon={item.icon}
+                                                        tone={item.tone}
+                                                        title={item.title}
+                                                        meta={item.meta}
+                                                        trailNode={
+                                                            <span
+                                                                className={`hm-pill hm-pill--${item.pillTone}`}
+                                                            >
+                                                                {item.pillText}
+                                                            </span>
+                                                        }
+                                                        onClick={() =>
+                                                            openQuestionsFromHome(
+                                                                item.practiceId
+                                                            )
+                                                        }
+                                                    />
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    ) : (
+                                        <HmEmpty
+                                            icon="fa-circle-check"
+                                            title="All evaluations up to date"
+                                            text="Practices needing evaluation or with submitted answers will appear here."
+                                        />
+                                    )}
+                                </HmCard>
+                            );
+                        })()}
                     </div>
                     <div className="hm-col">
                         <HmCard
@@ -895,7 +1262,8 @@ export default function HomeApp() {
             ['#profile', 'fa-user', 'My profile']
         ];
 
-        const pct = pr.total ? Math.round((pr.active / pr.total) * 100) : 0;
+        const inProgress = pr.open ?? ((pr.active || 0) + (pr.evaluating || 0) + (pr.grading || 0));
+        const pct = pr.total ? Math.round((inProgress / pr.total) * 100) : 0;
         const actions = [
             {
                 label: pendingUsers.total ? 'Review registrations' : 'Create practice',
@@ -915,7 +1283,7 @@ export default function HomeApp() {
                     ringNode={
                         <HmRing
                             pct={pct}
-                            center={num(pr.active)}
+                            center={num(inProgress)}
                             small="active"
                             label="Practices in progress"
                         />
@@ -928,7 +1296,7 @@ export default function HomeApp() {
                         tone=""
                         valueNode={
                             <>
-                                {num(pr.active)} <small>/ {num(pr.total)}</small>
+                                {num(inProgress)} <small>/ {num(pr.total)}</small>
                             </>
                         }
                         label="Active practices"
@@ -1049,6 +1417,8 @@ export default function HomeApp() {
                             <HmStack
                                 parts={[
                                     { label: 'Active', value: pr.active || 0, cls: 'hm-c-active' },
+                                    { label: 'Evaluating', value: pr.evaluating || 0, cls: 'hm-c-evaluating' },
+                                    { label: 'Grading', value: pr.grading || 0, cls: 'hm-c-grading' },
                                     { label: 'Completed', value: pr.completed || 0, cls: 'hm-c-done' },
                                     {
                                         label: 'Cancelled',

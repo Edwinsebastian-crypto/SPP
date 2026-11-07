@@ -40,14 +40,14 @@ flowchart TD
         Cloudinary[("Cloudinary\n(Almacenamiento de evidencias y PDFs)")]
     end
 
-    UI -->|HTTP / JSON + Session| Routes
+    UI -->|"HTTP / JSON + Session"| Routes
     Repos --> PostgreSQL
     Repos --> Cloudinary
-    Services -->|Proxy Gateway Seguro (HMAC)| FastAPI
-    Services -->|Disparo de Eventos| NotifApp
+    Services -->|"Proxy Gateway Seguro (HMAC)"| FastAPI
+    Services -->|"Disparo de Eventos"| NotifApp
     FastAPI --> PostgreSQL
     NotifApp --> MongoDB
-    NotifApp -.->|Consulta sondeo 24h| Routes
+    NotifApp -.->|"Consulta sondeo 24h"| Routes
 ```
 
 ---

@@ -141,7 +141,12 @@ export default function CreatePracticeApp() {
         return (
             studentPractices.length === 0 ||
             studentPractices.every(
-                (p) => p.status === 'completed' || String(p.id) === String(editingId)
+                (p) =>
+                    p.status === 'completed' ||
+                    p.status === 'finalizada' ||
+                    p.status === 'cancelled' ||
+                    p.status === 'cancelada' ||
+                    String(p.id) === String(editingId)
             )
         );
     });

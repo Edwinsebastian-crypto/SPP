@@ -67,8 +67,16 @@ class UserService {
       await admin.auth.admin.deleteUser(data.user.id).catch(() => {}); // never leave orphan accounts
       throw err;
     }
-    this.auditService.record(actor, { entity: AUDIT_ENTITIES.USER, entityId: input.documentNumber, action: AUDIT_ACTIONS.INSERT });
     const created = await this.userRepository.findByDocument(input.documentNumber);
+    const safeCreated = created ? { ...created } : { ...input };
+    delete safeCreated.password;
+    this.auditService.record(actor, {
+      entity: AUDIT_ENTITIES.USER,
+      entityId: input.documentNumber,
+      action: AUDIT_ACTIONS.INSERT,
+      after: safeCreated,
+      details: `Usuario ${input.documentNumber} (${input.role}) creado con estado ${input.status || USER_STATUS.ACTIVE}`
+    });
     // welcome e-mail for students, tutors and advisors (the service ignores directors)
     if (created && this.notificationService) this.notificationService.userRegistered(created);
     return created;
@@ -102,8 +110,22 @@ class UserService {
         : await admin.auth.admin.createUser({ email: current.email, password: input.password, email_confirm: true, app_metadata: { spp: true, role: current.role } });
       if (result.error) throw HttpError.badRequest(`Could not change the password: ${result.error.message}`);
     }
-    this.auditService.record(actor, { entity: AUDIT_ENTITIES.USER, entityId: documentNumber, action: AUDIT_ACTIONS.UPDATE });
-    return this.userRepository.findByDocument(documentNumber);
+
+    const updated = await this.userRepository.findByDocument(documentNumber);
+    const safeCurrent = { ...current };
+    delete safeCurrent.password;
+    const safeUpdated = { ...updated };
+    delete safeUpdated.password;
+
+    this.auditService.record(actor, {
+      entity: AUDIT_ENTITIES.USER,
+      entityId: documentNumber,
+      action: AUDIT_ACTIONS.UPDATE,
+      before: safeCurrent,
+      after: safeUpdated,
+      details: `Usuario ${documentNumber} actualizado`
+    });
+    return updated;
   }
 
   /** pending -> active means the Director just approved the account: the user is told. */
@@ -118,8 +140,22 @@ class UserService {
     if (this.#isSelf(actor, current) && status !== USER_STATUS.ACTIVE) throw HttpError.conflict('You cannot deactivate your own account');
     await this.userRepository.updateStatus(current.role, documentNumber, status);
     this.#notifyIfApproved(current, status);
-    this.auditService.record(actor, { entity: AUDIT_ENTITIES.USER, entityId: documentNumber, action: AUDIT_ACTIONS.UPDATE });
-    return this.userRepository.findByDocument(documentNumber);
+
+    const updated = await this.userRepository.findByDocument(documentNumber);
+    const safeCurrent = { ...current };
+    delete safeCurrent.password;
+    const safeUpdated = { ...updated };
+    delete safeUpdated.password;
+
+    this.auditService.record(actor, {
+      entity: AUDIT_ENTITIES.USER,
+      entityId: documentNumber,
+      action: AUDIT_ACTIONS.UPDATE,
+      before: safeCurrent,
+      after: safeUpdated,
+      details: `Estado de usuario ${documentNumber} cambiado de ${current.status} a ${status}`
+    });
+    return updated;
   }
 
   async remove(actor, documentNumber) {
@@ -135,7 +171,17 @@ class UserService {
     } catch (err) {
       console.warn('[supabase] could not delete the account:', err.message);
     }
-    this.auditService.record(actor, { entity: AUDIT_ENTITIES.USER, entityId: documentNumber, action: AUDIT_ACTIONS.DELETE });
+
+    const safeCurrent = { ...current };
+    delete safeCurrent.password;
+
+    this.auditService.record(actor, {
+      entity: AUDIT_ENTITIES.USER,
+      entityId: documentNumber,
+      action: AUDIT_ACTIONS.DELETE,
+      before: safeCurrent,
+      details: `Usuario ${documentNumber} (${current.role}) eliminado`
+    });
   }
 }
 

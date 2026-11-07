@@ -15,6 +15,19 @@ import { Icon, Badge, BusyButton } from '../common/Badge';
 import { Modal } from '../common/Modal';
 import { emit, EVENTS } from '../../core/events';
 import { provide } from '../../core/registry';
+import { getPractice } from '../../core/practiceStore';
+
+const isPracticeReadOnly = () => {
+    const p = getPractice().practice;
+    if (!p) return false;
+    const st = String(p.status || '').toLowerCase();
+    return (
+        st === 'completed' ||
+        st === 'finalizada' ||
+        st === 'cancelled' ||
+        st === 'cancelada'
+    );
+};
 
 const refreshQuestionsPill = () => {
     emit(EVENTS.UPDATE_STUDENT_QUESTIONS_PILL);
@@ -76,7 +89,25 @@ export default function StudentEvaluationApp() {
         setErrorLista(null);
         try {
             const api = getEvalAPI()?.estudiante;
-            const data = await api.misEvaluaciones();
+            let data = await api.misEvaluaciones();
+            if (Array.isArray(data)) {
+                let currentP = getPractice().practice;
+                if (!currentP) {
+                    try {
+                        const res = await fetch('/api/home', { credentials: 'same-origin' });
+                        if (res.ok) {
+                            const homeJson = await res.json();
+                            currentP = homeJson?.home?.practice;
+                        }
+                    } catch (_) { /* ignore */ }
+                }
+                const currentPid = String(currentP?.id || currentP?.code || '').trim();
+                if (currentPid) {
+                    data = data.filter(
+                        (ev) => String(ev.id_practica || '').trim() === currentPid
+                    );
+                }
+            }
             setLista(Array.isArray(data) ? data : []);
         } catch (e) {
             setErrorLista(e.message || 'Could not load evaluations.');
@@ -372,31 +403,33 @@ export default function StudentEvaluationApp() {
         })();
 
         let accion = null;
-        if (abierto) {
-            accion = {
-                txt: 'Continue',
-                ic: 'fa-solid fa-play',
-                cls: 'ev-btn--gold',
-                fn: () => iniciar(ev.id_evaluacion),
-            };
-        } else if (ev.puede_intentar) {
-            accion = {
-                txt: ev.intentos_usados ? 'New attempt' : 'Start',
-                ic: 'fa-solid fa-play',
-                cls: 'ev-btn--primary',
-                fn: () => confirmarInicio(ev),
-            };
+        if (!isPracticeReadOnly()) {
+            if (abierto) {
+                accion = {
+                    txt: 'Continue',
+                    ic: 'fa-solid fa-play',
+                    cls: 'ev-btn--gold',
+                    fn: () => iniciar(ev.id_evaluacion),
+                };
+            } else if (ev.puede_intentar) {
+                accion = {
+                    txt: ev.intentos_usados ? 'New attempt' : 'Start',
+                    ic: 'fa-solid fa-play',
+                    cls: 'ev-btn--primary',
+                    fn: () => confirmarInicio(ev),
+                };
+            }
         }
 
         const verRes =
-            ev.id_ultimo_intento && !ev.puede_intentar && !abierto
+            ev.id_ultimo_intento && (!ev.puede_intentar || isPracticeReadOnly()) && !abierto
                 ? {
                       txt: 'View result',
                       ic: 'fa-solid fa-chart-simple',
                       cls: 'ev-btn--dark',
                       fn: () => abrirResultado(ev.id_ultimo_intento),
                   }
-                : vencida && !abierto && !ev.puede_intentar
+                : (vencida || isPracticeReadOnly()) && !abierto && (!ev.puede_intentar || isPracticeReadOnly())
                 ? {
                       txt: 'View questions',
                       ic: 'fa-solid fa-eye',
@@ -417,6 +450,14 @@ export default function StudentEvaluationApp() {
         }
 
         const abrirTarjeta = () => {
+            if (isPracticeReadOnly()) {
+                if (ev.id_ultimo_intento) {
+                    abrirResultado(ev.id_ultimo_intento);
+                } else {
+                    iniciar(ev.id_evaluacion);
+                }
+                return;
+            }
             if (abierto) {
                 iniciar(ev.id_evaluacion);
             } else if (ev.puede_intentar) {

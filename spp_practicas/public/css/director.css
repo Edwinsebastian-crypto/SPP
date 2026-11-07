@@ -725,6 +725,16 @@
     transform: translateX(3px);
  }
 
+ .ev-item--cancel {
+    color: #b93232;
+ }
+
+ .ev-item--cancel:hover {
+    background: rgba(185, 50, 50, 0.12);
+    color: #8b2424;
+    transform: translateX(3px);
+ }
+
  body.dark-theme #evidences-panel .ev-card,
  body.dark-theme #evidences-panel .feedback-card {
     background: #D1E5DE;
@@ -1034,6 +1044,10 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
  }
 
  .stats-grid {
@@ -1877,6 +1891,18 @@
  #manage-practices .ev-item--delete:hover,
  #manage-institutions .ev-item--delete:hover {
     background: rgba(185, 50, 50, 0.1);
+    color: #8b2424;
+    transform: translateX(3px);
+ }
+
+ #manage-practices .ev-item--cancel,
+ #manage-institutions .ev-item--cancel {
+    color: #b93232;
+ }
+
+ #manage-practices .ev-item--cancel:hover,
+ #manage-institutions .ev-item--cancel:hover {
+    background: rgba(185, 50, 50, 0.12);
     color: #8b2424;
     transform: translateX(3px);
  }

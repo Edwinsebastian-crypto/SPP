@@ -508,16 +508,6 @@ export default function ProfileAndNotificationsApp() {
                         </span>
                     </div>
                     <div className="bell-head-right">
-                        {unread > 0 ? (
-                            <button
-                                type="button"
-                                className="bell-markall"
-                                onClick={() => markRead(null)}
-                                title="Marcar todas como leídas"
-                            >
-                                <i className="fa-solid fa-check" aria-hidden="true" /> Marcar todas
-                            </button>
-                        ) : null}
                         <button
                             type="button"
                             className="bell-close-btn"
@@ -532,6 +522,16 @@ export default function ProfileAndNotificationsApp() {
                         >
                             <i className="fa-solid fa-xmark" aria-hidden="true" />
                         </button>
+                        {unread > 0 ? (
+                            <button
+                                type="button"
+                                className="bell-markall"
+                                onClick={() => markRead(null)}
+                                title="Marcar todas como leídas"
+                            >
+                                <i className="fa-solid fa-check" aria-hidden="true" /> Marcar todas
+                            </button>
+                        ) : null}
                     </div>
                 </div>
 

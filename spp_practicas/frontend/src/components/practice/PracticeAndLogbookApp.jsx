@@ -19,8 +19,35 @@ const STATUS_COLORS = {
     evaluating: '#0284c7',
     evaluando: '#0284c7',
     grading: '#d97706',
-    calificando: '#d97706'
+    calificando: '#d97706',
+    approved: '#15803d',
+    failed: '#b3261e'
 };
+
+export function getPracticeStatusDisplay(practice) {
+    if (!practice || !practice.status) return { label: '', color: '' };
+    const raw = String(practice.status).trim().toLowerCase();
+    if (raw === 'completed' || raw === 'finalizada') {
+        const lb = practice.logbook || {};
+        const rawGrade = lb.finalGrade;
+        const gradeNum = rawGrade != null && rawGrade !== '' ? parseFloat(rawGrade) : null;
+        if (gradeNum !== null && !isNaN(gradeNum)) {
+            const isApproved = gradeNum >= 3.0;
+            return {
+                label: isApproved ? 'Completed (Approved)' : 'Completed (Failed)',
+                color: isApproved ? '#15803d' : '#b3261e'
+            };
+        }
+        return { label: 'Completed', color: STATUS_COLORS.completed };
+    }
+    const color = STATUS_COLORS[raw] || '#6b7280';
+    let label = practice.status;
+    if (raw === 'active' || raw === 'activa') label = 'Active';
+    else if (raw === 'evaluating' || raw === 'evaluando') label = 'Evaluating';
+    else if (raw === 'grading' || raw === 'calificando') label = 'Grading';
+    else if (raw === 'cancelled' || raw === 'cancelada') label = 'Cancelled';
+    return { label, color };
+}
 
 function computeLogbookHero(logbook) {
     const lb = logbook || {};
@@ -60,7 +87,8 @@ function computeLogbookHero(logbook) {
 }
 
 export default function PracticeAndLogbookApp({ role }) {
-    const hasPracticeFilters = role === 'director' || role === 'tutor';
+    const hasPracticeFilters =
+        role === 'director' || role === 'tutor' || role === 'advisor' || role === 'student';
     const [filtersToolbarEl, setFiltersToolbarEl] = useState(null);
     const [practicePanelEl, setPracticePanelEl] = useState(null);
     const [logbookPanelEl, setLogbookPanelEl] = useState(null);
@@ -87,6 +115,8 @@ export default function PracticeAndLogbookApp({ role }) {
     const [editOpen, setEditOpen] = useState(false);
     const [gradeInput, setGradeInput] = useState('');
     const [obsInput, setObsInput] = useState('');
+    const [calculatedGradeInfo, setCalculatedGradeInfo] = useState(null);
+    const [calculatingGrade, setCalculatingGrade] = useState(false);
 
     // Director 3-dot menu open state
     const [dirMenuOpen, setDirMenuOpen] = useState(false);
@@ -126,12 +156,20 @@ export default function PracticeAndLogbookApp({ role }) {
             pPanel.innerHTML = '';
             setPracticePanelEl(pPanel);
 
-            if (role === 'director' || role === 'tutor') {
+            if (
+                role === 'director' ||
+                role === 'tutor' ||
+                role === 'advisor' ||
+                role === 'student'
+            ) {
                 let fBar = document.getElementById('practice-filters-toolbar');
                 if (!fBar && pPanel.parentNode) {
                     fBar = document.createElement('div');
                     fBar.id = 'practice-filters-toolbar';
-                    fBar.className = 'um-toolbar pf-toolbar';
+                    fBar.className =
+                        role === 'student'
+                            ? 'um-toolbar pf-toolbar pf-toolbar--student'
+                            : 'um-toolbar pf-toolbar';
                     pPanel.parentNode.insertBefore(fBar, pPanel);
                 }
                 if (fBar) {
@@ -477,8 +515,9 @@ export default function PracticeAndLogbookApp({ role }) {
         if (!evalApi) return;
         try {
             let items = [];
-            if (role === 'director' && typeof evalApi.director?.listar === 'function') {
-                const res = await evalApi.director.listar({ limite: 200 });
+            if (role === 'director' && typeof (evalApi.director?.listarEvaluaciones || evalApi.director?.listar) === 'function') {
+                const fn = evalApi.director.listarEvaluaciones || evalApi.director.listar;
+                const res = await fn({ limite: 200 });
                 items = res?.items || (Array.isArray(res) ? res : []);
             } else if (role === 'tutor' && typeof evalApi.tutor?.listarEvaluaciones === 'function') {
                 const res = await evalApi.tutor.listarEvaluaciones();
@@ -491,27 +530,22 @@ export default function PracticeAndLogbookApp({ role }) {
                 const pid = String(ev.id_practica || '').trim();
                 if (!pid) continue;
                 if (!map[pid]) {
-                    map[pid] = { evaluating: false, grading: false };
+                    map[pid] = {
+                        hasEvaluations: true,
+                        evaluating: false,
+                        grading: false,
+                        totalEvals: 0,
+                        closedEvals: 0,
+                        publishedEvals: 0
+                    };
                 }
-                const enviados = Number(ev.intentos_enviados) || 0;
-                const iniciados = Number(ev.intentos_iniciados) || 0;
-                const presentados = Number(ev.intentos_presentados) || 0;
-                const calificados = Number(ev.intentos_calificados) || 0;
-                const pendientes = Number(ev.pendientes_revision) || 0;
-
-                if (
-                    ev.estado === 'PUBLICADA' &&
-                    ((enviados === 0 && calificados === 0) || iniciados > enviados)
-                ) {
-                    map[pid].evaluating = true;
-                }
-                if (
-                    pendientes > 0 ||
-                    enviados > calificados ||
-                    presentados > calificados ||
-                    ev.estado === 'BORRADOR'
-                ) {
+                map[pid].totalEvals += 1;
+                if (ev.estado === 'CERRADA') {
+                    map[pid].closedEvals += 1;
                     map[pid].grading = true;
+                } else if (ev.estado === 'PUBLICADA') {
+                    map[pid].publishedEvals += 1;
+                    map[pid].evaluating = true;
                 }
             }
             setEvalStatesByPractice(map);
@@ -629,7 +663,6 @@ export default function PracticeAndLogbookApp({ role }) {
     // Compute filtered practices for Tutor & Director
     const filteredPractices = useMemo(() => {
         if (!hasPracticeFilters) return practices;
-        const todayIso = new Date().toISOString().slice(0, 10);
         const q = searchQuery.trim().toLowerCase();
         return practices.filter((p) => {
             // 1. Search by student
@@ -646,19 +679,26 @@ export default function PracticeAndLogbookApp({ role }) {
                     return false;
                 }
             }
-            // 3. Filter by practice status [Activa, Cancelada, Finalizada, Evaluando, Calificando]
+            // 3. Filter by practice status [Active, Cancelled, Completed, Evaluating, Grading]
             if (statusFilter !== 'all') {
                 const rawStatus = String(p.status || '')
                     .trim()
                     .toLowerCase();
                 const evState = evalStatesByPractice[String(p.id || p.code || '')] || {};
-                const endIso = p.endDate ? String(p.endDate).slice(0, 10) : '';
-                const hasFinalGrade =
-                    p.logbook && p.logbook.finalGrade != null && p.logbook.finalGrade !== '';
-                const isPastEndUnGraded = Boolean(endIso && endIso < todayIso && !hasFinalGrade);
 
                 if (statusFilter === 'active') {
-                    if (rawStatus !== 'active' && rawStatus !== 'activa') return false;
+                    if (role === 'student') {
+                        if (
+                            rawStatus === 'completed' ||
+                            rawStatus === 'finalizada' ||
+                            rawStatus === 'cancelled' ||
+                            rawStatus === 'cancelada'
+                        ) {
+                            return false;
+                        }
+                    } else {
+                        if (rawStatus !== 'active' && rawStatus !== 'activa') return false;
+                    }
                 } else if (statusFilter === 'cancelled') {
                     if (rawStatus !== 'cancelled' && rawStatus !== 'cancelada') return false;
                 } else if (statusFilter === 'completed') {
@@ -674,8 +714,12 @@ export default function PracticeAndLogbookApp({ role }) {
                     const matchesGrading =
                         rawStatus === 'grading' ||
                         rawStatus === 'calificando' ||
-                        ((rawStatus === 'active' || rawStatus === 'activa') &&
-                            (Boolean(evState.grading) || isPastEndUnGraded));
+                        (rawStatus !== 'completed' &&
+                            rawStatus !== 'finalizada' &&
+                            rawStatus !== 'cancelled' &&
+                            rawStatus !== 'cancelada' &&
+                            Boolean(evState.hasEvaluations) &&
+                            Boolean(evState.closedEvals > 0));
                     if (!matchesGrading) return false;
                 }
             }
@@ -808,7 +852,77 @@ export default function PracticeAndLogbookApp({ role }) {
 
     const isReadOnly =
         currentPractice?.status === 'completed' ||
-        currentPractice?.status === 'cancelled';
+        currentPractice?.status === 'finalizada' ||
+        currentPractice?.status === 'cancelled' ||
+        currentPractice?.status === 'cancelada';
+
+    const loadCalculatedGrade = useCallback(async (practiceObj) => {
+        if (!practiceObj) {
+            setCalculatedGradeInfo(null);
+            return;
+        }
+        setCalculatingGrade(true);
+        try {
+            const pid = practiceObj.id || practiceObj.code;
+            // 1. Obtener actividades de la práctica
+            let actList = [];
+            try {
+                const actRes = await get(`/api/practices/${pid}/activities`);
+                actList = (actRes && actRes.activities) || [];
+            } catch (_) { /* ignore */ }
+
+            const gradedActs = actList
+                .map((a) => (a.grade != null && a.grade !== '' ? parseFloat(a.grade) : null))
+                .filter((g) => g !== null && !isNaN(g) && g >= 0);
+
+            const actAvg =
+                gradedActs.length > 0
+                    ? gradedActs.reduce((acc, v) => acc + v, 0) / gradedActs.length
+                    : null;
+
+            // 2. Obtener evaluaciones de la práctica
+            let evalGrade = null;
+            try {
+                const evalApi = EvalAPI;
+                if (evalApi && evalApi.tutor && typeof evalApi.tutor.listarEvaluaciones === 'function') {
+                    const evs = await evalApi.tutor.listarEvaluaciones({ id_practica: String(pid) });
+                    const list = Array.isArray(evs) ? evs : evs?.items || [];
+                    const notas = [];
+                    for (const ev of list) {
+                        if (ev.nota_final != null && !isNaN(parseFloat(ev.nota_final))) {
+                            notas.push(parseFloat(ev.nota_final));
+                        } else if (ev.nota_promedio != null && !isNaN(parseFloat(ev.nota_promedio))) {
+                            notas.push(parseFloat(ev.nota_promedio));
+                        }
+                    }
+                    if (notas.length > 0) {
+                        evalGrade = notas.reduce((acc, v) => acc + v, 0) / notas.length;
+                    }
+                }
+            } catch (_) { /* ignore */ }
+
+            let suggested = null;
+            if (actAvg !== null && evalGrade !== null) {
+                suggested = (actAvg + evalGrade) / 2;
+            } else if (actAvg !== null) {
+                suggested = actAvg;
+            } else if (evalGrade !== null) {
+                suggested = evalGrade;
+            }
+
+            setCalculatedGradeInfo({
+                suggested: suggested !== null ? Number(suggested.toFixed(1)) : null,
+                actAvg: actAvg !== null ? Number(actAvg.toFixed(1)) : null,
+                actCount: gradedActs.length,
+                totalActs: actList.length,
+                evalGrade: evalGrade !== null ? Number(evalGrade.toFixed(1)) : null
+            });
+        } catch (_) {
+            setCalculatedGradeInfo(null);
+        } finally {
+            setCalculatingGrade(false);
+        }
+    }, []);
 
     const handleOpenTutorEdit = () => {
         if (role !== 'tutor' || !currentPractice || isReadOnly) return;
@@ -816,6 +930,7 @@ export default function PracticeAndLogbookApp({ role }) {
         setGradeInput(lb.finalGrade != null && lb.finalGrade !== '' ? String(lb.finalGrade) : '');
         setObsInput(lb.generalObservation || '');
         setEditOpen(true);
+        loadCalculatedGrade(currentPractice);
         setTimeout(() => {
             if (gradeInputRef.current) gradeInputRef.current.focus();
         }, 20);
@@ -886,10 +1001,10 @@ export default function PracticeAndLogbookApp({ role }) {
         setDirMenuOpen(false);
         if (!currentPractice) return;
         const confirmed = await confirmModal({
-            title: 'Cancelar práctica',
+            title: 'Cancel practice',
             message:
-                '¿Estás seguro de que deseas cancelar esta práctica? Pasará a modo solo lectura y esta acción no se puede deshacer.',
-            confirmLabel: 'Cancelar práctica'
+                'Are you sure you want to cancel this practice? It will switch to read-only mode and this action cannot be undone.',
+            confirmLabel: 'Cancel practice'
         });
         if (!confirmed) return;
         try {
@@ -898,8 +1013,8 @@ export default function PracticeAndLogbookApp({ role }) {
             inject('reports')?.reload?.();
             emit(EVENTS.HOME_REFRESH);
             await alertModal({
-                title: 'Práctica cancelada',
-                message: 'La práctica ha sido cancelada correctamente.'
+                title: 'Practice cancelled',
+                message: 'The practice has been successfully cancelled.'
             });
         } catch (err) {
             showError(err);
@@ -924,17 +1039,19 @@ export default function PracticeAndLogbookApp({ role }) {
             {hasPracticeFilters && filtersToolbarEl
                 ? createPortal(
                       <>
-                          <div className="um-search">
-                              <i className="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                              <input
-                                  type="search"
-                                  id="pf-search"
-                                  placeholder="Search by student..."
-                                  aria-label="Search by student"
-                                  value={searchQuery}
-                                  onChange={(e) => setSearchQuery(e.target.value)}
-                              />
-                          </div>
+                          {role !== 'student' && (
+                              <div className="um-search">
+                                  <i className="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                                  <input
+                                      type="search"
+                                      id="pf-search"
+                                      placeholder="Search by student..."
+                                      aria-label="Search by student"
+                                      value={searchQuery}
+                                      onChange={(e) => setSearchQuery(e.target.value)}
+                                  />
+                              </div>
+                          )}
 
                           <div ref={semesterFilterWrapRef} className="cp-input-wrap um-filter-wrap">
                               <select
@@ -968,11 +1085,17 @@ export default function PracticeAndLogbookApp({ role }) {
                                   onChange={(e) => setStatusFilter(e.target.value)}
                               >
                                   <option value="all">All</option>
-                                  <option value="active">Activa</option>
-                                  <option value="cancelled">Cancelada</option>
-                                  <option value="completed">Finalizada</option>
-                                  <option value="evaluating">Evaluando</option>
-                                  <option value="grading">Calificando</option>
+                                  <option value="active">Active</option>
+                                  {role === 'student' ? (
+                                      <option value="completed">Completed</option>
+                                  ) : (
+                                      <>
+                                          <option value="cancelled">Cancelled</option>
+                                          <option value="completed">Completed</option>
+                                          <option value="evaluating">Evaluating</option>
+                                          <option value="grading">Grading</option>
+                                      </>
+                                  )}
                               </select>
                               <i
                                   className="fa-solid fa-chevron-down right-icon"
@@ -1014,19 +1137,23 @@ export default function PracticeAndLogbookApp({ role }) {
                               </h2>
                               <div className="practice-status">
                                   <span>Status</span>
-                                  <div
-                                      className="status-badge"
-                                      title={(currentPractice && currentPractice.status) || ''}
-                                      style={{
-                                          backgroundColor:
-                                              (currentPractice &&
-                                                  STATUS_COLORS[currentPractice.status]) ||
-                                              ''
-                                      }}
-                                  >
-                                      {(currentPractice && currentPractice.status) || ''}
-                                  </div>
-                                  {role === 'director' ? (
+                                  {(() => {
+                                      const stDisplay = getPracticeStatusDisplay(currentPractice);
+                                      return (
+                                          <div
+                                              className="status-badge"
+                                              title={stDisplay.label}
+                                              style={{
+                                                  backgroundColor: stDisplay.color
+                                              }}
+                                          >
+                                              {stDisplay.label}
+                                          </div>
+                                      );
+                                  })()}
+                                  {role === 'director' &&
+                                  currentPractice?.status !== 'cancelled' &&
+                                  currentPractice?.status !== 'cancelada' ? (
                                       <div
                                           ref={dirMenuRef}
                                           className="ev-menu-wrapper"
@@ -1080,14 +1207,13 @@ export default function PracticeAndLogbookApp({ role }) {
                                                   ></i>{' '}
                                                   Editar
                                               </button>
-                                               {currentPractice?.status !== 'cancelled' &&
-                                               currentPractice?.status !== 'completed' ? (
+                                               {currentPractice?.status !== 'completed' &&
+                                               currentPractice?.status !== 'finalizada' ? (
                                                    <button
                                                        type="button"
                                                        className="ev-dropdown-item ev-item--cancel"
                                                        id="btn-cancel-practice"
                                                        role="menuitem"
-                                                       style={{ color: '#b3261e' }}
                                                        onClick={handleCancelPracticeDirector}
                                                    >
                                                        <i
@@ -1103,7 +1229,6 @@ export default function PracticeAndLogbookApp({ role }) {
                                                   id="btn-delete-practice"
                                                   role="menuitem"
                                                   style={{
-                                                      color: '#b3261e',
                                                       display: activitiesBadges.canDelete ? 'flex' : 'none'
                                                   }}
                                                   onClick={handleDeletePracticeDirector}
@@ -1166,11 +1291,25 @@ export default function PracticeAndLogbookApp({ role }) {
                                                   No practices match the selected filters
                                               </option>
                                           ) : (
-                                              displayedPractices.map((p) => (
-                                                  <option key={p.id} value={p.id}>
-                                                      {`${p.student} — ${p.code}`}
-                                                  </option>
-                                              ))
+                                              displayedPractices.map((p) => {
+                                                   const rawSt = String(p.status || '').toLowerCase();
+                                                   let suffix = '';
+                                                   if (rawSt === 'completed' || rawSt === 'finalizada') {
+                                                       const lb = p.logbook || {};
+                                                       const rawGrade = lb.finalGrade;
+                                                       const gNum = rawGrade != null && rawGrade !== '' ? parseFloat(rawGrade) : null;
+                                                       if (gNum !== null && !isNaN(gNum)) {
+                                                           suffix = gNum >= 3.0 ? ' — Completed (Approved)' : ' — Completed (Failed)';
+                                                       } else {
+                                                           suffix = ' — Completed';
+                                                       }
+                                                   }
+                                                   return (
+                                                       <option key={p.id} value={p.id}>
+                                                           {`${p.student} — ${p.code}${suffix}`}
+                                                       </option>
+                                                   );
+                                               })
                                           )}
                                       </select>
                                       <i
@@ -1538,6 +1677,68 @@ export default function PracticeAndLogbookApp({ role }) {
                                   >
                                       Edit Grade and Observation
                                   </h4>
+                                   {calculatingGrade ? (
+                                       <div style={{ fontSize: '12px', color: '#53685e', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                           <i className="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                                           <span>Calculating suggested grade based on activities and evaluation...</span>
+                                       </div>
+                                   ) : calculatedGradeInfo && calculatedGradeInfo.suggested !== null ? (
+                                       <div
+                                           style={{
+                                               background: '#f0fdf4',
+                                               border: '1px solid #bbf7d0',
+                                               borderRadius: '12px',
+                                               padding: '12px 16px',
+                                               marginBottom: '16px',
+                                               display: 'flex',
+                                               alignItems: 'center',
+                                               justifyContent: 'space-between',
+                                               flexWrap: 'wrap',
+                                               gap: '12px'
+                                           }}
+                                       >
+                                           <div>
+                                               <div style={{ fontSize: '13px', fontWeight: 600, color: '#166534', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                   <i className="fa-solid fa-calculator" aria-hidden="true"></i>
+                                                   Suggested Grade: <strong>{calculatedGradeInfo.suggested.toFixed(1)} / 5.0</strong>
+                                               </div>
+                                               <div style={{ fontSize: '12px', color: '#15803d', marginTop: '4px' }}>
+                                                   {calculatedGradeInfo.actAvg !== null
+                                                       ? `Activities avg: ${calculatedGradeInfo.actAvg.toFixed(1)} (${calculatedGradeInfo.actCount}/${calculatedGradeInfo.totalActs} graded)`
+                                                       : 'No graded activities'}
+                                                   {calculatedGradeInfo.evalGrade !== null
+                                                       ? ` • Evaluation grade: ${calculatedGradeInfo.evalGrade.toFixed(1)}`
+                                                       : ' • No graded evaluation'}
+                                               </div>
+                                           </div>
+                                           <button
+                                               type="button"
+                                               style={{
+                                                   background: '#166534',
+                                                   color: '#ffffff',
+                                                   border: 'none',
+                                                   borderRadius: '8px',
+                                                   padding: '6px 14px',
+                                                   fontSize: '12px',
+                                                   fontWeight: 600,
+                                                   cursor: 'pointer',
+                                                   display: 'inline-flex',
+                                                   alignItems: 'center',
+                                                   gap: '6px',
+                                                   boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                               }}
+                                               onClick={(e) => {
+                                                   e.preventDefault();
+                                                   e.stopPropagation();
+                                                   setGradeInput(String(calculatedGradeInfo.suggested.toFixed(1)));
+                                                   if (gradeInputRef.current) gradeInputRef.current.focus();
+                                               }}
+                                           >
+                                               <i className="fa-solid fa-check" aria-hidden="true"></i>
+                                               Apply suggested ({calculatedGradeInfo.suggested.toFixed(1)})
+                                           </button>
+                                       </div>
+                                   ) : null}
                                   <div
                                       style={{
                                           display: 'grid',

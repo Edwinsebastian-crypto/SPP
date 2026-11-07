@@ -1,172 +1,185 @@
-# SPP · Pedagogical Practice Software
+# Monolito SPP · Sistema de Prácticas Pedagógicas
 
-Web application to manage pedagogical practicums. Students, tutors, advisors and the practicum director work on the
-same practice: logbook, activities, evidence, feedback, question bank, grades and accreditation reports.
+Servicio central del ecosistema SPP encargado de la gestión integral, seguimiento pedagógico, registro de actividades y control administrativo de las prácticas académicas universitarias.
 
-**Stack:** Node.js 18+ · Express · Supabase Auth · PostgreSQL (Neon) · MongoDB Atlas · Cloudinary · React 19 + Vite 6
-front end (`frontend/src/` compiled to `public/dist/`). Deployed on Render.
+Construido en **Node.js 18+ (Express)** con frontend reactivo en **React 19 + Vite 6**, autenticación mediante **Supabase Auth**, persistencia relacional en **PostgreSQL (Supabase)**, almacenamiento documental en **MongoDB Atlas** y subida de evidencias en la nube con **Cloudinary**.
 
-## Roles and panels
+---
 
-Each role has its own panel in `public/pages/`, served only to the matching role. All panels share the same shell
-(sidebar, top bar, theme, mobile menu) and are responsive.
+## 🎯 ¿Qué hace este servicio?
 
-| Role | Panel | What it does |
-|---|---|---|
-| Student | `student.html` | six activities per practice, evidence upload (file + description + hours), feedback, question bank answers |
-| Tutor | `tutor.html` | review evidence, give feedback, grade the logbook, assign questions from the bank |
-| Advisor | `advisor.html` | review evidence and give pedagogical feedback |
-| Director | `director.html` | manage users, institutions, practice types and practices; question bank; dashboard and accreditation reports |
+El monolito es el núcleo transaccional del sistema y coordina todo el ciclo de vida de la práctica pedagógica:
 
-## Project structure
+1. **Gestión de Prácticas y Matrículas**:
+   - Registro y vinculación entre estudiante, tutor académico, asesor de la institución educativa y director de programa.
+   - Control de estados (Borrador, Asignada, En Curso, Culminada, Cancelada).
+   - Contabilización automática de horas acumuladas por práctica.
 
+2. **Seguimiento de Actividades y Evidencias**:
+   - Módulo de 6 actividades pedagógicas reglamentarias por práctica.
+   - Carga segura de evidencias documentales y multimedia asociadas a cada actividad con almacenamiento en Cloudinary.
+   - Registro de horas de labor formativa por evidencia.
+
+3. **Retroalimentación y Calificación (Bitácora / Logbook)**:
+   - Panel de retroalimentación pedagógica para tutores y asesores.
+   - Calificación de actividades y asignación de la nota final de la práctica con observaciones formativas.
+
+4. **Administración y Acreditación (Panel del Director)**:
+   - Aprobación, activación, edición y gestión de perfiles de usuarios.
+   - Administración de instituciones educativas aliadas y tipos de práctica.
+   - Tablero con indicadores cuantitativos de acreditación institucional (porcentaje de aprobación, cumplimiento de horas, reportes agregados).
+   - Exportación de auditoría y reportes consolidados en formatos **Excel (XLSX)**, **CSV** y paquetes **ZIP**.
+
+5. **Integración con Microservicios (Orquestador)**:
+   - **Pasarela hacia Evaluación (`servicio_evaluacion`)**: Enruta de forma segura peticiones autenticadas mediante tokens HMAC (HS256) de corta duración, garantizando que los usuarios solo accedan a las evaluaciones de sus prácticas.
+   - **Despachador de Eventos hacia Notificaciones (`servicio_notificaciones`)**: Emite eventos del ciclo de vida (registro, asignación, calificación) para el envío de correos y alimenta la campana de notificaciones de cada panel.
+
+---
+
+## 👥 Paneles y Roles de Usuario
+
+Cada rol dispone de una interfaz dedicada protegida por control de acceso (RBAC):
+
+| Rol | Vista Principal | Responsabilidades |
+| :--- | :--- | :--- |
+| **Estudiante** (`student`) | `student.html` | Consulta de práctica, registro de horas, subida de archivos de evidencia, realización de evaluaciones y revisión de retroalimentaciones. |
+| **Tutor Académico** (`tutor`) | `tutor.html` | Seguimiento directo al estudiante, revisión y calificación de evidencias, emisión de retroalimentación pedagógica, calificación de bitácora y gestión de evaluaciones con IA. |
+| **Asesor Pedagógico** (`advisor`) | `advisor.html` | Acompañamiento institucional in situ, revisión de evidencias y aportes de retroalimentación formativa. |
+| **Director** (`director`) | `director.html` | Configuración de la plataforma, aprobación de cuentas, vinculación de prácticas, gestión de instituciones, métricas de acreditación y auditoría. |
+
+---
+
+## 🏛️ Arquitectura del Software
+
+El servicio sigue una arquitectura en capas desacopladas (Clean Layered Architecture / MVC):
+
+```text
+[ Cliente Web / React 19 ]
+           │ (HTTP / JSON / Cookies HttpOnly)
+           ▼
+[ Middlewares de Seguridad ] ── (Helmet, CSP, CORS, Rate Limit, Auth Supabase)
+           │
+[ Rutas & Enrutamiento ] ── (Definición de endpoints y control de roles)
+           │
+[ Controladores (Controllers) ] ── (Validación de entrada y orquestación HTTP)
+           │
+[ Capa de Servicios (Services) ] ── (Lógica de negocio, autorizaciones, reglas y cálculos)
+      ├── Gateway Proxies ──▶ [ Microservicio de Evaluación (FastAPI) ]
+      ├── Event Dispatcher ─▶ [ Microservicio de Notificaciones (Express) ]
+      └── Repositorios (Repositories)
+                 ├── PostgreSQL (Pool con consultas SQL parametrizadas)
+                 ├── MongoDB (Auditoría e indicadores de acreditación)
+                 └── Cloudinary (Almacenamiento de archivos y evidencias)
 ```
-src/
-  server.js           entry point: loads the real column names, opens the port, graceful shutdown
-  app.js              builds the Express app (middlewares, routes, static files, error handler)
-  container.js        composition root: wires repositories → services → controllers
-  config/             env.js (validated env access) · constants.js (roles, statuses, limits)
-  routes/             URL + verb + role guard → controller (no logic)
-  controllers/        HTTP only: validate → call a service → present
-  services/           business rules, authorization, auditing, notifications
-  repositories/       all SQL / Mongo queries; legacy names ⇄ English domain model
-  validators/         request input → clean DTOs
-  presenters/         the JSON contract consumed by the views
-  middlewares/        authentication, roles, CSRF, security headers, uploads, errors
-  models/             Mongoose schemas (audit log, notifications, accreditation indicators)
-  infrastructure/     PostgreSQL pools, Mongo, Supabase, Cloudinary, schema resolver
-  utils/              HttpError, asyncHandler, validators, id generator…
-  scripts/            operational CLIs
-frontend/
-  src/
-    core/             shared ES modules: api, events, registry, practiceStore, shell, panels, modals, custom-select, reports-kit
-    hooks/            useCustomSelect hook
-    components/       React components per domain (auth, home, practice, activities, student, tutor, director, reports, common)
-    entries/          Vite entry points per role/page
-    utils/            evaluation bridge and helpers
-public/
-  pages/              one HTML shell per role
-  dist/               Vite compiled bundles served by Express
-  css/                variables, shell, per-panel styles
-  img/
-database/             SQL schema (evaluation DB) + local test fixture (practice DB)
-tests/                unit · repository integration · HTTP end-to-end
-docs/                 architecture, API reference, data contract
+
+### Estructura de Directorios
+
+```text
+spp_practicas/
+├── src/
+│   ├── server.js            # Punto de entrada principal y levantamiento del servidor HTTP
+│   ├── app.js               # Ensamblado de Express, middlewares globales y rutas
+│   ├── container.js         # Contenedor de inyección de dependencias
+│   ├── config/              # Variables de entorno validadas y constantes del sistema
+│   ├── routes/              # Declaración de endpoints protegidos por guardas de rol
+│   ├── controllers/         # Controladores HTTP de entrada y salida
+│   ├── services/            # Casos de uso y reglas de negocio del dominio
+│   ├── repositories/        # Consultas de acceso a datos a PostgreSQL y MongoDB
+│   ├── middlewares/         # Autenticación, control RBAC, CSP, subida de archivos y auditoría
+│   └── infrastructure/      # Conexiones a bases de datos y proveedores externos
+│
+├── frontend/                # Aplicación Frontend React 19
+│   ├── src/
+│   │   ├── components/      # Componentes UI organizados por dominio
+│   │   ├── core/            # Estado global (practiceStore), bus de eventos (events) y API
+│   │   ├── entries/         # Puntos de entrada Vite por cada vista/rol
+│   │   └── hooks/           # Hooks personalizados de React
+│   └── vite.config.js       # Configuración de compilación dirigida a public/dist/
+│
+├── public/                  # Archivos estáticos y plantillas del navegador
+│   ├── dist/                # Bundles de JavaScript/CSS generados por Vite
+│   ├── pages/               # Vistas HTML contenedor (App Shell) por rol
+│   ├── css/                 # Estilos institucionales CSS
+│   └── index.html           # Vista de inicio de sesión
+│
+├── scripts/                 # Scripts operacionales y de automatización
+├── tests/                   # Suite de pruebas unitarias, repositorios e integración E2E
+└── package.json             # Dependencias del proyecto y scripts npm
 ```
 
-Request flow: **view (JS) → `/api` route → controller → service → repository → database.**
-The views never touch a database. Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the layering rules and a
-checklist for adding features, and [docs/API.md](docs/API.md) for every endpoint.
+---
 
-## E-mail notifications
+## 🔒 Mecanismos de Seguridad
 
-A separate microservice (`../servicio_notificaciones`, Node + MongoDB + SMTP) e-mails students, tutors, advisors and the
-director: account registered / approved, practice assigned, activity feedback and grades, practice grade, evaluation
-published / graded, due-date reminders and daily pending-review digests. The monolith only publishes events
-(`NOTIFICATION_SERVICE_URL` / `NOTIFICATION_SERVICE_SECRET`); see [docs/NOTIFICATION-SERVICE.md](docs/NOTIFICATION-SERVICE.md).
-The same notifications feed the bell of every panel (`GET /api/notifications`).
+- **Sesiones y Cookies**: Cookies `HttpOnly`, con atributos `SameSite=Lax` y bandera `Secure` en producción.
+- **Validación de Identidad**: Integración con Supabase Auth restringida a cuentas creadas por el sistema institucional.
+- **Protección contra Inyecciones**: Todas las consultas a PostgreSQL utilizan consultas SQL parametrizadas (`$1, $2, ...`).
+- **Políticas de Contenido (CSP)**: Cabeceras `Content-Security-Policy` estrictas sin scripts inline arbitrarios.
+- **Control de Carga de Archivos**: Validación de tipos MIME y límite de tamaño a 10 MB antes del procesamiento hacia Cloudinary.
+- **Trazabilidad y Auditoría**: Registro persistente en MongoDB de modificaciones sobre prácticas, evidencias, notas y usuarios.
 
-## Getting started
+---
 
-1. `npm install`
-2. Copy `.env.example` to `.env` and fill it in. **Never commit `.env` and never paste keys into code or `.env.example`.**
-3. `npm run schema:verify`: compares your tables with what the code expects and reports anything missing.
-4. `npm run schema:apply`: creates only the missing tables of the **evaluation** database (the practice database is never touched).
-5. `npm run users:migrate`: creates the Supabase access account of the users that already exist in your database
-   (for testing: `npm run users:migrate -- --password=Test1234` gives everyone the same temporary password).
-   To create only the director: `npm run director:create`.
-6. `npm start` (or `npm run dev` with auto-reload) and open <http://localhost:3000>.
+## ⚙️ Puesta en Marcha
 
-On the login screen type the part before the `@` (completed with `INSTITUTIONAL_DOMAIN`) or the full e-mail, and
-pick your role.
+### Requisitos Previos
+- **Node.js** >= 18.x
+- **PostgreSQL** (local o base de datos en Supabase)
+- **MongoDB** (local o cluster en MongoDB Atlas)
 
-## Environment variables
+### 1. Instalación de Dependencias
+```bash
+npm install
+```
 
-See `.env.example` for the full, commented list. Groups:
+### 2. Configurar Variables de Entorno
+Copia el archivo base y ajusta las credenciales:
+```bash
+cp .env.example .env
+```
 
-| Group | Variables |
-|---|---|
-| Server | `PORT`, `NODE_ENV`, `TZ` |
-| Supabase | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (server only), `INSTITUTIONAL_DOMAIN` |
-| PostgreSQL | `DATABASE_URL_PRACTICE`, `DB_SSL` |
-| MongoDB | `MONGO_URI_PRIMARY` (audit log + indicators) |
-| Notifications | `NOTIFICATION_SERVICE_URL`, `NOTIFICATION_SERVICE_SECRET` (shared with `servicio_notificaciones`) |
-| Cloudinary | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` |
-| Director bootstrap | `DIRECTOR_FIRST_NAMES`, `DIRECTOR_LAST_NAMES`, `DIRECTOR_DOCUMENT`, `DIRECTOR_USERNAME`, `DIRECTOR_PASSWORD` |
-| Security | `LOGIN_MAX_ATTEMPTS` |
+Parámetros clave en `.env`:
+- `PORT`: Puerto de escucha del servidor (por defecto: `3000`).
+- `DATABASE_URL_PRACTICE`: Cadena de conexión a PostgreSQL.
+- `MONGO_URI_PRIMARY`: Cadena de conexión a MongoDB para auditoría e indicadores.
+- `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`: Credenciales de autenticación.
+- `CLOUDINARY_*`: Credenciales de almacenamiento de archivos.
+- `EVALUATION_SERVICE_URL` / `EVALUATION_SERVICE_SECRET`: Enlace al microservicio de evaluación.
+- `NOTIFICATION_SERVICE_URL` / `NOTIFICATION_SERVICE_SECRET`: Enlace al microservicio de notificaciones.
 
-The former Spanish variable names still work as aliases, so an existing `.env` keeps working.
+### 3. Compilar el Frontend React
+```bash
+npm run build
+```
+Genera los paquetes optimizados en `public/dist/`.
 
-## Scripts
+### 4. Iniciar el Servidor
+- **Modo Desarrollo (con reinicio automático):**
+  ```bash
+  npm run dev
+  ```
+- **Modo Producción:**
+  ```bash
+  npm start
+  ```
+El servicio estará disponible en: [http://localhost:3000](http://localhost:3000)
 
-| Command | Purpose |
-|---|---|
-| `npm run build` | build the React front end (`frontend/src/` → `public/dist/`) |
-| `npm start` / `npm run dev` | run the server |
-| `npm run schema:verify` | check database tables |
-| `npm run users:migrate` / `director:create` | create Supabase access accounts |
-| `npm test` | unit + repository + HTTP end-to-end tests |
-| `npm run test:unit` / `test:repositories` / `test:e2e` | run one suite |
-| `npm run test:notifications` | notification events, bell and hooks |
-| `npm run lint` | ESLint (server and browser code) |
+### 5. Iniciar Todo el Ecosistema en Simultáneo
+Para arrancar el monolito junto con los microservicios de evaluación y notificaciones:
+```bash
+npm run start:all
+```
 
-## Testing
+---
 
-`npm test` runs three suites. The last two need a **local** PostgreSQL with an empty database `spp_est`
-(user/password `spp`) and **drop its contents**: they refuse to run against a non-local host.
-Use `DATABASE_URL_PRACTICE_TEST` to point at another local instance.
+## 🧪 Pruebas Automatizadas
 
-## How it connects to your database
+```bash
+# Ejecutar toda la suite de pruebas
+npm test
 
-* **Users:** one table per role (`estudiante`, `tutor_academico`, `asesor_pedagogico`, `director`). Supabase checks
-  the password; the system links the account by **institutional e-mail**.
-* **Logbook:** it has no table; the grade and observation live in `practica` (`notaFinal = 0` / `observacionFinal = ''`
-  mean "not graded").
-* **Evidence:** `evidenciaactividad` (description + hours) and `evidenciaarchivo` (Cloudinary URL).
-* **Feedback:** `retroalimentacion_t` (tutor) and `retroalimentacion_a` (advisor), attached to an **evidence**.
-* **Activities:** six are generated per practice (`<practiceId>-A1` … `A6`), the six buttons of the student view.
-* **Text keys (varchar(30))** are generated in `utils/id-generator.js` (`PRA-…`, `EV-…`, `TIP-001`…).
-* Irregular column names (`correInst`, `"estado "`…) are resolved at startup by `infrastructure/schema-resolver.js`.
-
-> The tables, columns and stored values keep their original Spanish names because the databases hold live data.
-> They are translated to English at the repository boundary. See [docs/DATA-CONTRACT.md](docs/DATA-CONTRACT.md).
-
-## Security
-
-* `httpOnly` + `SameSite=Lax` cookies (+ `Secure` in production). Role and status are always read from the database.
-* **Only Supabase accounts created by this system are accepted** (`app_metadata.spp = true`, confirmed e-mail), so
-  nobody can sign in by registering in Supabase with someone else's e-mail. Also disable *Allow new users to sign up*
-  in Supabase (Authentication → Sign In / Providers).
-* Every panel is served only to its role; every endpoint checks role and ownership (non-participants get 404).
-* CSRF header `X-SPP`, login rate limit, parameterised queries, strict CSP (no inline scripts / handlers), uploads
-  limited to 10 MB and to allowed types (pdf, images, office, text).
-* New users never get a pre-filled default password: the director must type or generate one (8–72 chars with upper,
-  lower and a digit).
-* Every change to practices, logbook, evidence, feedback, answers and users is written to an audit log (MongoDB).
-
-## Front end notes
-
-* **React + Vite architecture**: Source lives in `frontend/src/` and builds into `public/dist/` via `npm run build`.
-  Cross-component communication uses `frontend/src/core/events.js` (`EVENTS`, `emit`, `on`), `frontend/src/core/registry.js`
-  (`provide`, `inject`), and `frontend/src/core/practiceStore.js` (`getPractice`, `setPractice`, `usePractice`) instead of
-  `window.*` globals.
-* **Mobile layout** (`max-width: 900px` or `max-height: 500px`): `.app-shell` is the only scrolling container; the top
-  bar is `position: fixed`. Use `resetScroll()` from `frontend/src/core/panels.js` or `scrollCardIntoShellView()` from
-  `frontend/src/core/shell.js` so the page title never ends up hidden under the top bar.
-* `shell.js` also resets any stray window/body scroll on mobile as a safety net.
-* After changing files in `frontend/src/`, run `npm run build` and hard-refresh to load the updated bundle in `public/dist/`.
-
-## Notes
-
-* In Mongo, `idPractica` and `idPrograma` are strings because they are varchar in PostgreSQL.
-* There is no "last access" column, so the user list does not show it.
-* Your schema does not validate `fechaFinal >= fechaInicio`; the application does.
-* Reports need MongoDB (`MONGO_URI_PRIMARY`); without it the dashboard still works but stored indicators are empty
-  and "Generate and save" answers 502.
-
-## Documentation
-
-* [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): layers, dependency rules, authorization model, front end, checklist
-* [docs/API.md](docs/API.md): every endpoint, body and role
-* [docs/DATA-CONTRACT.md](docs/DATA-CONTRACT.md): Spanish ⇄ English mapping of tables, columns and values
-* [docs/NOTIFICATION-SERVICE.md](docs/NOTIFICATION-SERVICE.md): notification integration (events and bell)
+# Ejecutar suites específicas
+npm run test:unit
+npm run test:repositories
+npm run test:e2e
+```

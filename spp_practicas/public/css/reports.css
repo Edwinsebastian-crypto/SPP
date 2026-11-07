@@ -3,8 +3,26 @@
    Builds on the .dv-* components of evaluacion.css (KPI tiles, cards, charts, tables).
    ========================================================================= */
 
-.rp-root { display: block; width: 100%; }
+.rp-root {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
 .rp-root > * + * { margin-top: 0; }
+
+/* Bloqueo total del destello/cintillo azul del navegador en móvil */
+*,
+*::before,
+*::after {
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+:focus:not(:focus-visible) {
+  outline: none !important;
+  box-shadow: none !important;
+}
 
 /* ---------- toolbar of each tab ---------- */
 .rp-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px; margin: 0 0 16px; }
@@ -41,34 +59,42 @@ body.dark-theme .dv-wrapper { --dv-s4: #7d8a84; }
 .rp-legend-top { margin: 0 0 4px; }
 
 /* ---------- accreditation panel ---------- */
-.rp-acc { margin: 0 0 22px; }
+.rp-acc {
+  margin: 0 0 22px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
 .rp-acc > * + * { margin-top: 16px; }
 .rp-acc-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 18px; }
 .rp-acc-title h3 { margin: 0; font-family: var(--font-serif); font-size: 20px; color: var(--text-primary); }
 .rp-acc-title p { margin: 4px 0 0; font-family: var(--font-sans); font-size: 12.5px; color: var(--dv-ink2); }
 .rp-acc-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .rp-acc-controls label { font-family: var(--font-serif); font-weight: 700; color: var(--text-primary); }
-.rp-acc-controls input[type="number"] { width: 92px; height: 42px; border-radius: 10px; border: 1px solid var(--dv-grid); padding: 0 10px; font-family: var(--font-sans); font-size: 14px; background: var(--input-bg, #fff); color: var(--input-text, var(--text-primary)); }
+.rp-acc-controls input[type="number"] { width: 92px; height: 42px; border-radius: 10px; border: 1px solid var(--dv-grid); padding: 0 10px; font-family: var(--font-sans); font-size: 14px; background: var(--input-bg, #fff); color: var(--input-text, var(--text-primary)); -webkit-tap-highlight-color: transparent; }
 .rp-acc-controls input[type="number"]:focus-visible { outline: 2px solid var(--clr-accent-gold); outline-offset: 1px; }
 .rp-acc-export {
   display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 16px; border-radius: 10px; cursor: pointer;
   border: 1.5px solid var(--dv-grid); background: transparent; color: var(--text-primary); font-family: var(--font-sans); font-size: 14px; font-weight: 600;
+  -webkit-tap-highlight-color: transparent !important;
 }
 .rp-acc-export:hover:not(:disabled) { border-color: #264a38; }
 .rp-acc-export:disabled { opacity: .5; cursor: not-allowed; }
 .rp-acc .cp-btn:disabled { opacity: .65; cursor: progress; }
+.rp-acc .cp-btn { -webkit-tap-highlight-color: transparent !important; }
 .rp-acc-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 0; }
 @media (max-width: 1100px) { .rp-acc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .rp-acc-kpis { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .rp-acc-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } }
+@media (max-width: 340px) { .rp-acc-kpis { grid-template-columns: 1fr; } }
 .rp-acc .dv-table th, .rp-acc .dv-table td { padding-left: 8px; padding-right: 8px; }
 .rp-acc .dv-table th { white-space: normal; vertical-align: bottom; }
-.rp-acc-kpis .dv-kpi, .rp-acc-panel .dv-kpi { padding: 14px; }
+.rp-acc-kpis .dv-kpi, .rp-acc-panel .dv-kpi { padding: 14px; min-width: 0; }
 .rp-acc-kpis .dv-kpi-value, .rp-acc-panel .dv-kpi-value { font-size: 25px; }
-.rp-acc-panel { margin-top: 14px; }
+.rp-acc-panel { margin-top: 14px; min-width: 0; max-width: 100%; }
 .rp-acc-panel .dv-kpis { margin-bottom: 16px; }
 .rp-acc-panel .dv-sub { margin-top: 22px; }
-.rp-acc-chart { margin: 4px 0 16px; }
-.rp-acc-detail { box-shadow: inset 0 0 0 2px var(--dv-grid), 0 4px 10px rgba(0,0,0,.05); margin-bottom: 0; }
+.rp-acc-chart { margin: 4px 0 16px; min-width: 0; }
+.rp-acc-detail { box-shadow: inset 0 0 0 2px var(--dv-grid), 0 4px 10px rgba(0,0,0,.05); margin-bottom: 0; min-width: 0; max-width: 100%; box-sizing: border-box; }
 
 .rp-note { display: flex; gap: 10px; align-items: flex-start; padding: 11px 14px; border-radius: 12px; font-family: var(--font-sans); font-size: 13px; line-height: 1.45; color: var(--text-primary); background: var(--input-bg); box-shadow: var(--input-shadow); border-left: 5px solid var(--dv-info); }
 .rp-note i { margin-top: 2px; }
@@ -295,13 +321,258 @@ body.dark-theme .rp-ex-link { color: #7fd1ac; }
 }
 
 /* ---------- small screens ---------- */
-@media (max-width: 700px) {
+@media (max-width: 768px) {
+  .reports-wrapper {
+    padding: 16px 12px calc(16px + env(safe-area-inset-bottom, 0px) + 30px) !important;
+    max-width: 100vw;
+    box-sizing: border-box;
+  }
+
   .rp-bar-actions { width: 100%; }
   .rp-bar-actions .ev-btn { flex: 1; justify-content: center; }
-  .rp-acc-head { align-items: stretch; }
-  .rp-acc-controls { width: 100%; }
-  .rp-acc-controls .cp-btn, .rp-acc-export { flex: 1 1 auto; justify-content: center; }
+
+  /* Contenedor principal de indicadores en pantalla pequeña */
+  .rp-acc.dv-card {
+    padding: 16px 12px !important;
+    border-radius: 16px;
+    margin-bottom: 16px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .rp-acc-head {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .rp-acc-title h3 {
+    font-size: 18px;
+  }
+
+  .rp-acc-title p {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .rp-acc-controls {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .rp-acc-controls label {
+    font-size: 13px;
+  }
+
+  .rp-acc-controls input[type="number"] {
+    width: 76px;
+    height: 38px;
+    font-size: 13.5px;
+    padding: 0 8px;
+  }
+
+  .rp-acc-export,
+  .rp-acc-controls .cp-btn {
+    flex: 1 1 calc(50% - 6px);
+    height: 38px;
+    padding: 0 10px;
+    font-size: 12.5px;
+    white-space: nowrap;
+    justify-content: center;
+    min-width: 120px;
+  }
+
+  /* KPIs en 2 columnas compactas en móvil para evitar columnas gigantes */
+  .rp-acc-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    margin-bottom: 4px;
+    width: 100%;
+  }
+
+  .rp-acc-kpis .dv-kpi {
+    padding: 10px 10px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    min-width: 0;
+    border-radius: 12px;
+  }
+
+  .rp-acc-kpis .dv-kpi-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  .rp-acc-kpis .dv-kpi-value {
+    font-size: 18px !important;
+    line-height: 1.15;
+  }
+
+  .rp-acc-kpis .dv-kpi-label {
+    font-size: 11.5px;
+    margin-top: 2px;
+    line-height: 1.25;
+  }
+
+  .rp-acc-kpis .dv-kpi-sub {
+    font-size: 10.5px;
+    margin-top: 2px;
+    line-height: 1.2;
+  }
+
+  /* Tabla con scroll horizontal garantizado sin recortar el panel */
+  .rp-acc .dv-tablewrap {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+    border: 1px solid var(--dv-grid, rgba(0, 0, 0, 0.08));
+    margin-top: 10px;
+    box-sizing: border-box;
+  }
+
+  .rp-acc .dv-table {
+    min-width: 650px;
+  }
+
+  .rp-acc .dv-table th,
+  .rp-acc .dv-table td {
+    padding: 8px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .rp-acc .dv-cell-title {
+    min-width: 140px;
+    font-size: 13px;
+  }
+
+  .rp-acc .dv-cell-sub {
+    font-size: 11px;
+  }
+
+  .rp-acc .dv-table .ev-btn {
+    padding: 4px 8px;
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+
+  /* Detalle de indicadores en pantalla pequeña */
+  .rp-acc-detail {
+    padding: 14px 10px !important;
+    border-radius: 14px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .rp-acc-detail .dv-card-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .rp-acc-detail .dv-card-head .dv-toggle {
+    align-self: flex-end;
+    margin-top: -28px;
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  .rp-acc-detail .ev-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 6px;
+    margin: 12px 0 14px;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+    width: 100%;
+  }
+
+  .rp-acc-detail .ev-tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 7px 12px;
+    font-size: 13px;
+  }
+
+  .rp-acc-panel .dv-filters {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .rp-acc-panel .dv-search {
+    width: 100%;
+  }
+
   .rp-strow { grid-template-columns: minmax(70px, 110px) 1fr auto; gap: 8px; }
   .rp-ex-list { grid-template-columns: 1fr; }
   .rp-ex-box { padding: 22px 16px 16px; }
+}
+
+@media (max-width: 380px) {
+  .rp-acc-controls .rp-acc-export,
+  .rp-acc-controls .cp-btn {
+    flex: 1 1 100%;
+  }
+}
+
+/* =========================================================================
+   BLOQUEO INTEGRAL DEL CINTILLO Y CONTORNO AZUL NATIVO EN MÓVILES
+   ========================================================================= */
+
+/* Eliminación del tap highlight azul al pulsar cualquier elemento */
+.reports-tab-btn,
+.reports-tab-btn:focus,
+.reports-tab-btn:active,
+.ev-tab,
+.ev-tab:focus,
+.ev-tab:active,
+.cp-btn,
+.cp-btn:focus,
+.cp-btn:active,
+.rp-acc-export,
+.rp-acc-export:focus,
+.rp-acc-export:active,
+.dv-toggle,
+.dv-toggle:focus,
+.dv-toggle:active,
+.ev-btn,
+.ev-btn:focus,
+.ev-btn:active,
+.dv-kpi,
+.dv-card {
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  user-select: none;
+}
+
+/* Foco accesible con el color institucional sin azul por defecto */
+.reports-tab-btn:focus-visible,
+.ev-tab:focus-visible,
+.cp-btn:focus-visible,
+.rp-acc-export:focus-visible,
+.dv-toggle:focus-visible,
+.ev-btn:focus-visible,
+.rp-acc-controls input[type="number"]:focus-visible {
+  outline: 2px solid var(--clr-accent-gold, #c5a059) !important;
+  outline-offset: 2px;
+  box-shadow: none !important;
+}
+
+/* Bloqueo del arco/cintillo azul de overscroll en Android Chrome */
+.reports-wrapper,
+.report-panel,
+.rp-root,
+.dv-tablewrap {
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: contain;
 }

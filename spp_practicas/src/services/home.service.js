@@ -153,13 +153,16 @@ class HomeService {
     const withEvidence = activities.filter((a) => Number(a.evidenceCount) > 0);
     const feedback = (await Promise.all(withEvidence.map(async (a) => {
       const list = await this.feedbackRepository.listByActivity(a.id);
-      return list.map((f) => ({ role: f.role, text: truncate(f.text, 160), date: f.date, activityTitle: activityLabel(a) }));
+      return list.map((f) => ({ activityId: a.id, role: f.role, text: truncate(f.text, 160), date: f.date, activityTitle: activityLabel(a) }));
     }))).flat().sort((x, y) => String(y.date).localeCompare(String(x.date))).slice(0, FEEDBACK_LIMIT);
+
+    const isStudentSelf = (item) => !item.dueDate && (!item.title || item.title.toLowerCase() === 'activity' || /^activity\s*#?\d+$/i.test(item.title));
+    const tutorProposedItems = analysis.items.filter((item) => !isStudentSelf(item));
 
     return {
       practice: this.#practiceCard(practice, analysis.workedHours, now),
       activities: { total: activities.length, ...analysis.counts, averageGrade: analysis.averageGrade },
-      upcoming: this.#deadlines(analysis.items.map((item) => ({ item, practice })), ['pending']),
+      upcoming: this.#deadlines(tutorProposedItems.map((item) => ({ item, practice })), ['pending']),
       recentFeedback: feedback
     };
   }
@@ -215,7 +218,16 @@ class HomeService {
       this.#recentAudit()
     ]);
 
-    const byStatus = (s) => practices.filter((p) => p.status === s);
+    const matchStatus = (p, status) => {
+      const s = String(p.status || '').toLowerCase();
+      if (status === PRACTICE_STATUS.ACTIVE) return s === 'active' || s === 'activa';
+      if (status === PRACTICE_STATUS.EVALUATING) return s === 'evaluating' || s === 'evaluando';
+      if (status === PRACTICE_STATUS.GRADING) return s === 'grading' || s === 'calificando';
+      if (status === PRACTICE_STATUS.COMPLETED) return s === 'completed' || s === 'finalizada';
+      if (status === PRACTICE_STATUS.CANCELLED) return s === 'cancelled' || s === 'cancelada';
+      return s === status;
+    };
+    const byStatus = (s) => practices.filter((p) => matchStatus(p, s));
     const active = practices.filter((p) => isOpen(p.status));
     const withActive = new Set(active.map((p) => p.studentDocument));
 
@@ -228,7 +240,15 @@ class HomeService {
 
     return {
       summary,
-      practices: { total: practices.length, active: active.length, completed: byStatus(PRACTICE_STATUS.COMPLETED).length, cancelled: byStatus(PRACTICE_STATUS.CANCELLED).length },
+      practices: {
+        total: practices.length,
+        active: byStatus(PRACTICE_STATUS.ACTIVE).length,
+        evaluating: byStatus(PRACTICE_STATUS.EVALUATING).length,
+        grading: byStatus(PRACTICE_STATUS.GRADING).length,
+        completed: byStatus(PRACTICE_STATUS.COMPLETED).length,
+        cancelled: byStatus(PRACTICE_STATUS.CANCELLED).length,
+        open: active.length
+      },
       pendingUsers: {
         total: pendingUsers.length,
         items: pendingUsers.slice(0, 15).map((u) => ({

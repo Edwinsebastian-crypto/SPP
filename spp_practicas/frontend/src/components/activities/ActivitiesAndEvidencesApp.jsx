@@ -248,7 +248,10 @@ function DropdownMenu({ id, style, ariaLabel = 'Options', items }) {
 export default function ActivitiesAndEvidencesApp({ role }) {
     const [practice, setPractice] = useState(null);
     const isPracticeReadOnly =
-        practice?.status === 'completed' || practice?.status === 'cancelled';
+        practice?.status === 'completed' ||
+        practice?.status === 'finalizada' ||
+        practice?.status === 'cancelled' ||
+        practice?.status === 'cancelada';
     const [activities, setActivities] = useState([]);
     const [activeFilter, setActiveFilter] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -527,61 +530,63 @@ export default function ActivitiesAndEvidencesApp({ role }) {
 
     useEffect(() => {
         const onOpenActivityEvent = async (detail) => {
-            const { practiceId, activityId } = detail || {};
+            const { practiceId, activityId, title } = detail || {};
             if (!activityId) return;
+
+            setLoadingDetail(true);
+            showPanel('evidences-panel', role === 'student' ? 'block' : 'flex');
 
             let act = activities.find((a) => String(a.id) === String(activityId));
             if (!act) {
+                const fallbackAct = { id: activityId, title: title || 'Activity', practiceId };
+                setCurrentActivity(fallbackAct);
+                setPracticeStore({ activity: fallbackAct });
+                setEvidences([]);
+                setFeedbacks([]);
+
                 const targetPracticeId =
                     practiceId ||
                     practiceRef.current?.id ||
                     getPractice().practice?.id;
-                if (targetPracticeId) {
-                    try {
-                        const data = await get(
-                            `/api/practices/${targetPracticeId}/activities`
-                        );
-                        const list = data.activities || [];
-                        list.forEach((item) => {
-                            const roleCount =
-                                role === 'advisor'
-                                    ? Number(
-                                          item.advisorFeedbackCount ??
-                                              item.feedbackCount ??
-                                              0
-                                      )
-                                    : Number(
-                                          item.tutorFeedbackCount ??
-                                              item.feedbackCount ??
-                                              0
-                                      );
-                            item.feedbackCount = roleCount;
-                            item.tutorFeedbackCount = roleCount;
-                            item.roleFeedbackCount = roleCount;
-                            item.hours = Number(item.hours) || 0;
-                            item.evidenceCount =
-                                Number(item.evidenceCount) || 0;
-                        });
-                        setActivities(list);
-                        act = list.find(
-                            (a) => String(a.id) === String(activityId)
-                        );
-                    } catch (_) {
-                        /* ignore */
+
+                const [actData] = await Promise.all([
+                    targetPracticeId
+                        ? get(`/api/practices/${targetPracticeId}/activities`).catch(() => null)
+                        : Promise.resolve(null),
+                    loadEvidenceAndFeedback({ id: activityId }, true)
+                ]);
+
+                if (actData && actData.activities) {
+                    const list = actData.activities || [];
+                    list.forEach((item) => {
+                        const roleCount =
+                            role === 'advisor'
+                                ? Number(item.advisorFeedbackCount ?? item.feedbackCount ?? 0)
+                                : Number(item.tutorFeedbackCount ?? item.feedbackCount ?? 0);
+                        item.feedbackCount = roleCount;
+                        item.tutorFeedbackCount = roleCount;
+                        item.roleFeedbackCount = roleCount;
+                        item.hours = Number(item.hours) || 0;
+                        item.evidenceCount = Number(item.evidenceCount) || 0;
+                    });
+                    setActivities(list);
+                    const found = list.find((a) => String(a.id) === String(activityId));
+                    if (found) {
+                        setCurrentActivity(found);
+                        setPracticeStore({ activity: found });
                     }
                 }
-            }
-
-            if (act) {
+            } else {
                 handleOpenActivity(act);
             }
         };
 
         return on(EVENTS.OPEN_ACTIVITY, onOpenActivityEvent);
-    }, [role, activities, handleOpenActivity]);
+    }, [role, activities, handleOpenActivity, loadEvidenceAndFeedback]);
 
     useEffect(() => {
         const onOpenUploadEvidenceEvent = () => {
+            if (isPracticeReadOnly) return;
             showPanel('activities-panel', 'flex');
             const stored = getPractice().practice;
             if (!practice && stored) {
@@ -597,7 +602,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
         };
 
         return on(EVENTS.OPEN_UPLOAD_EVIDENCE, onOpenUploadEvidenceEvent);
-    }, [practice, loadActivities]);
+    }, [isPracticeReadOnly, practice, loadActivities]);
 
     const handleBackToLogbook = () => {
         showPanel('logbook-panel', 'flex');
@@ -1822,7 +1827,8 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                           ) : (
                               evidences.map((ev) => {
                                   const closed =
-                                      isActivityClosed(currentActivity);
+                                      isActivityClosed(currentActivity) ||
+                                      isPracticeReadOnly;
                                   const descText =
                                       ev.description ||
                                       'No description provided';

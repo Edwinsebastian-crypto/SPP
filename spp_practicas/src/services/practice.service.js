@@ -55,13 +55,24 @@ class PracticeService {
       await this.activityRepository.addFiles(activity.id, uploadedFiles);
     }
     
+    const createdActivity = await this.activityRepository.findById(activity.id);
+    this.auditService.record(user, {
+      entity: 'activity',
+      entityId: activity.id,
+      practiceId: practice.id,
+      action: AUDIT_ACTIONS.INSERT,
+      after: createdActivity || activity,
+      details: `Actividad ${activity.name || activity.id} creada en práctica ${practice.id}`
+    });
+
     return activity;
   }
 
   async updateActivity(user, practiceId, activityId, data, files) {
     const practice = await this.access.loadAuthorized(user, practiceId);
     this.lifecycle.assertWritable(practice);
-    const previousGrade = data.grade !== undefined ? Number((await this.activityRepository.findById(activityId))?.grade) || 0 : 0;
+    const previousActivity = await this.activityRepository.findById(activityId);
+    const previousGrade = data.grade !== undefined ? Number(previousActivity?.grade) || 0 : 0;
 
     // Process file deletions if keptFileIds is provided (usually when editing via modal)
     if (data.keptFileIds) {
@@ -93,12 +104,23 @@ class PracticeService {
     }
 
     await this.activityRepository.update(activityId, data);
+    const updatedActivity = await this.activityRepository.findById(activityId);
+    this.auditService.record(user, {
+      entity: 'activity',
+      entityId: activityId,
+      practiceId: practice.id,
+      action: AUDIT_ACTIONS.UPDATE,
+      before: previousActivity,
+      after: updatedActivity,
+      details: `Actividad ${activityId} actualizada`
+    });
+
     // a new grade (> 0 and different from the stored one) -> the student is told
     const newGrade = Number(data.grade);
     if (data.grade !== undefined && newGrade > 0 && newGrade !== previousGrade && this.notificationService) {
       this.notificationService.activityGraded({ activityId, grader: user });
     }
-    return this.activityRepository.findById(activityId);
+    return updatedActivity;
   }
 
   async removeActivity(user, practiceId, activityId) {
@@ -124,7 +146,14 @@ class PracticeService {
     }
     
     await this.activityRepository.deleteActivity(activityId);
-    this.auditService.record(user, { entity: 'activity', entityId: activityId, practiceId: practice.id, action: AUDIT_ACTIONS.DELETE });
+    this.auditService.record(user, {
+      entity: 'activity',
+      entityId: activityId,
+      practiceId: practice.id,
+      action: AUDIT_ACTIONS.DELETE,
+      before: activity,
+      details: `Actividad ${activity.name || activityId} eliminada`
+    });
   }
 
   /** Verifies that the referenced catalog entries exist and that the participants have the right role and are active. */
@@ -149,7 +178,15 @@ class PracticeService {
   async create(actor, input) {
     const { type, student, tutor, advisor } = await this.#validateReferences(input);
     const id = await this.practiceRepository.create(input);
-    this.auditService.record(actor, { entity: AUDIT_ENTITIES.PRACTICE, entityId: id, practiceId: id, action: AUDIT_ACTIONS.INSERT });
+    const created = await this.practiceRepository.findById(id);
+    this.auditService.record(actor, {
+      entity: AUDIT_ENTITIES.PRACTICE,
+      entityId: id,
+      practiceId: id,
+      action: AUDIT_ACTIONS.INSERT,
+      after: created || input,
+      details: `Práctica creada con estudiante ${input.studentDocument}, tutor ${input.tutorDocument} y asesor ${input.advisorDocument}`
+    });
 
     this.notificationService.notifyPracticeAssigned({
       practiceId: id,
@@ -162,7 +199,7 @@ class PracticeService {
         { person: advisor, roleLabel: 'pedagogical advisor' }
       ]
     });
-    return this.practiceRepository.findById(id);
+    return created;
   }
 
   async update(actor, id, input) {
@@ -177,8 +214,17 @@ class PracticeService {
       throw HttpError.conflict('The practice is completed and can only be viewed (change the end date to reopen it for grading)');
     }
     await this.practiceRepository.update(id, { ...input, status });
-    this.auditService.record(actor, { entity: AUDIT_ENTITIES.PRACTICE, entityId: id, practiceId: id, action: AUDIT_ACTIONS.UPDATE });
-    return this.practiceRepository.findById(id);
+    const updated = await this.practiceRepository.findById(id);
+    this.auditService.record(actor, {
+      entity: AUDIT_ENTITIES.PRACTICE,
+      entityId: id,
+      practiceId: id,
+      action: AUDIT_ACTIONS.UPDATE,
+      before: existing,
+      after: updated,
+      details: `Práctica ${id} actualizada`
+    });
+    return updated;
   }
 
   /** The Director cancels the practice: from then on it can only be viewed. */
@@ -188,23 +234,57 @@ class PracticeService {
     if (practice.status === PRACTICE_STATUS.CANCELLED) throw HttpError.conflict('The practice is already cancelled');
     if (practice.status === PRACTICE_STATUS.COMPLETED) throw HttpError.conflict('A completed practice cannot be cancelled');
     await this.practiceRepository.setStatus(id, PRACTICE_STATUS.CANCELLED);
-    this.auditService.record(actor, { entity: AUDIT_ENTITIES.PRACTICE, entityId: id, practiceId: id, action: AUDIT_ACTIONS.UPDATE });
-    return this.practiceRepository.findById(id);
+    const updated = await this.practiceRepository.findById(id);
+    this.auditService.record(actor, {
+      entity: AUDIT_ENTITIES.PRACTICE,
+      entityId: id,
+      practiceId: id,
+      action: AUDIT_ACTIONS.UPDATE,
+      before: practice,
+      after: updated,
+      details: `Práctica ${id} cancelada`
+    });
+    return updated;
   }
 
   async remove(actor, id) {
-    if (!(await this.practiceRepository.findById(id))) throw HttpError.notFound('Practice not found');
+    const existing = await this.practiceRepository.findById(id);
+    if (!existing) throw HttpError.notFound('Practice not found');
     await this.practiceRepository.delete(id);
-    this.auditService.record(actor, { entity: AUDIT_ENTITIES.PRACTICE, entityId: id, practiceId: id, action: AUDIT_ACTIONS.DELETE });
+    this.auditService.record(actor, {
+      entity: AUDIT_ENTITIES.PRACTICE,
+      entityId: id,
+      practiceId: id,
+      action: AUDIT_ACTIONS.DELETE,
+      before: existing,
+      details: `Práctica ${id} eliminada`
+    });
   }
 
   /** The assigned tutor (or the director) records the final grade and a general observation. */
   async updateLogbook(actor, practiceId, input) {
     const practice = await this.access.loadAuthorized(actor, practiceId);
     this.lifecycle.assertCanGrade(practice);
+    const beforeLogbook = {
+      finalGrade: practice.finalGrade,
+      finalObservation: practice.finalObservation
+    };
     await this.practiceRepository.updateLogbook(practice.id, input);
     const status = await this.lifecycle.afterLogbook(practice, input);
-    this.auditService.record(actor, { entity: AUDIT_ENTITIES.LOGBOOK, entityId: practice.id, practiceId: practice.id, action: AUDIT_ACTIONS.UPDATE });
+    const afterLogbook = {
+      finalGrade: input.finalGrade,
+      finalObservation: input.finalObservation,
+      status
+    };
+    this.auditService.record(actor, {
+      entity: AUDIT_ENTITIES.LOGBOOK,
+      entityId: practice.id,
+      practiceId: practice.id,
+      action: AUDIT_ACTIONS.UPDATE,
+      before: beforeLogbook,
+      after: afterLogbook,
+      details: `Bitácora de práctica ${practice.id} calificada con nota ${input.finalGrade}`
+    });
     // a new final grade (> 0 and different from the stored one) -> the student is told ("0" means not graded)
     if (status === PRACTICE_STATUS.COMPLETED && input.finalGrade > 0 && Number(input.finalGrade) !== Number(practice.finalGrade) && this.notificationService) {
       this.notificationService.practiceGraded({ practiceId: practice.id });

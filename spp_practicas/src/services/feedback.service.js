@@ -29,7 +29,14 @@ class FeedbackService {
     const feedback = await this.feedbackRepository.create({
       evidenceId, authorDocument: user.documentNumber, authorRole: user.role, text, date
     });
-    this.auditService.record(user, { entity: AUDIT_ENTITIES.FEEDBACK, entityId: feedback.id, practiceId: practice.id, action: AUDIT_ACTIONS.INSERT });
+    this.auditService.record(user, {
+      entity: AUDIT_ENTITIES.FEEDBACK,
+      entityId: feedback.id,
+      practiceId: practice.id,
+      action: AUDIT_ACTIONS.INSERT,
+      after: feedback,
+      details: `Retroalimentación registrada por ${user.role} para evidencia ${evidenceId}`
+    });
     // the student is told that a tutor / advisor left feedback on their activity
     if (this.notificationService) this.notificationService.feedbackCreated({ activityId: activity.id, feedbackId: feedback.id, author: user, text });
     return feedback;
@@ -45,8 +52,17 @@ class FeedbackService {
     if (feedback.authorDocument !== user.documentNumber) throw HttpError.forbidden('You can only modify your own feedback');
 
     const updated = await this.feedbackRepository.update({ id: feedbackId, text, date });
-    this.auditService.record(user, { entity: AUDIT_ENTITIES.FEEDBACK, entityId: feedbackId, practiceId: practice.id, action: AUDIT_ACTIONS.UPDATE });
-    return { id: feedbackId, text, date: updated.date, authorDocument: user.documentNumber, role: feedback.role, evidenceId: feedback.evidenceId };
+    const result = { id: feedbackId, text, date: updated.date, authorDocument: user.documentNumber, role: feedback.role, evidenceId: feedback.evidenceId };
+    this.auditService.record(user, {
+      entity: AUDIT_ENTITIES.FEEDBACK,
+      entityId: feedbackId,
+      practiceId: practice.id,
+      action: AUDIT_ACTIONS.UPDATE,
+      before: feedback,
+      after: result,
+      details: `Retroalimentación ${feedbackId} modificada`
+    });
+    return result;
   }
 
   async remove(user, activityId, feedbackId) {
@@ -57,7 +73,14 @@ class FeedbackService {
     if (feedback.authorDocument !== user.documentNumber) throw HttpError.forbidden('You can only delete your own feedback');
 
     await this.feedbackRepository.remove(feedbackId);
-    this.auditService.record(user, { entity: AUDIT_ENTITIES.FEEDBACK, entityId: feedbackId, practiceId: practice.id, action: AUDIT_ACTIONS.DELETE });
+    this.auditService.record(user, {
+      entity: AUDIT_ENTITIES.FEEDBACK,
+      entityId: feedbackId,
+      practiceId: practice.id,
+      action: AUDIT_ACTIONS.DELETE,
+      before: feedback,
+      details: `Retroalimentación ${feedbackId} eliminada`
+    });
   }
 }
 
