@@ -115,7 +115,9 @@ export default function PracticeTypesApp() {
             await loadTypes();
             emit(EVENTS.DATA_CHANGED);
             inject('reports')?.reload?.();
-            revealCard(savedId);
+            if (isEdit) {
+                revealCard(savedId);
+            }
             await alertModal({
                 title: isEdit ? 'Practice type updated' : 'Practice type created',
                 message: isEdit

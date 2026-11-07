@@ -91,6 +91,17 @@ function practiceGraded({ fullName, practiceName, finalGrade, observation }) {
   };
 }
 
+function practiceReadyToEvaluate({ fullName, studentName, practiceName }) {
+  return {
+    subject: `Es hora de evaluar: ${studentName}`,
+    content: [
+      hello(fullName),
+      `${studentName} completó todas las horas de la práctica "${practiceName}".`,
+      'La práctica pasó al estado «Evaluando»: ya puedes evaluar al estudiante y registrar su calificación desde el SPP.'
+    ].join('\n\n')
+  };
+}
+
 function evaluationAvailable({ fullName, title, dueAt, tz }) {
   return {
     subject: `Ya está disponible tu evaluación: ${title}`,
@@ -174,6 +185,6 @@ function ungradedPractices({ fullName, items, total, tz }) {
 }
 
 module.exports = {
-  userRegistered, userApproved, practiceAssigned, activityFeedback, activityGraded, practiceGraded, evaluationAvailable,
+  userRegistered, userApproved, practiceAssigned, activityFeedback, activityGraded, practiceGraded, practiceReadyToEvaluate, evaluationAvailable,
   evaluationGraded, activityDueSoon, evaluationDueSoon, reviewPending, ungradedPractices, MAX_LIST
 };

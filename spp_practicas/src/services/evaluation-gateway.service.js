@@ -18,7 +18,8 @@ const ROUTES = Object.freeze({
     route('PATCH', `/evaluaciones/${ID}`, 'patchEvaluation'),
     route('DELETE', `/evaluaciones/${ID}`),
     route('POST', `/evaluaciones/${ID}/publicar`, undefined, 'notifyPublished'),
-    route('POST', `/evaluaciones/${ID}/(despublicar|cerrar|generar)`),
+    route('POST', `/evaluaciones/${ID}/cerrar`, undefined, 'evaluationClosed'),
+    route('POST', `/evaluaciones/${ID}/(despublicar|generar)`),
     route('POST', `/evaluaciones/${ID}/preguntas`),
     route('POST', `/evaluaciones/${ID}/preguntas/aprobar-todas`),
     route('PUT', `/evaluaciones/${ID}/preguntas/orden`),
@@ -74,8 +75,9 @@ function errorMessage(body, status) {
  */
 class EvaluationGatewayService {
   /** @param {{client: object, practiceAccessService: object, practiceRepository?: {list: Function}, notificationService?: object, now?: () => number}} deps */
-  constructor({ client, practiceAccessService, practiceRepository, notificationService = null, now = () => Date.now() }) {
+  constructor({ client, practiceAccessService, practiceRepository, notificationService = null, practiceLifecycleService = null, now = () => Date.now() }) {
     this.notifications = notificationService;
+    this.lifecycle = practiceLifecycleService;
     this.client = client;
     this.access = practiceAccessService;
     this.practices = practiceRepository;
@@ -136,6 +138,7 @@ class EvaluationGatewayService {
     if (!practiceId) throw HttpError.badRequest('id_practica is required');
     const practice = await this.access.loadAuthorized(user, practiceId);
     if (practice.status === PRACTICE_STATUS.CANCELLED) throw HttpError.conflict('The practice is cancelled');
+    if (practice.status === PRACTICE_STATUS.COMPLETED) throw HttpError.conflict('The practice is completed and can only be viewed');
 
     const payload = { id_practica: practice.id, id_estudiante: practice.studentDocument };
     for (const field of CREATE_FIELDS) if (input[field] !== undefined) payload[field] = input[field];
@@ -161,6 +164,14 @@ class EvaluationGatewayService {
         evaluationId: body.id_evaluacion, practiceId: body.id_practica, studentDocument: body.id_estudiante,
         title: body.titulo, dueAt: body.fecha_limite
       });
+    }
+    return body;
+  }
+
+  /** The tutor closed an evaluation -> the practice moves from "evaluating" to "grading" (never alters the response). */
+  async evaluationClosed(body) {
+    if (this.lifecycle && body && body.id_practica) {
+      try { await this.lifecycle.evaluationClosed(String(body.id_practica)); } catch (_) { /* the response must not fail */ }
     }
     return body;
   }

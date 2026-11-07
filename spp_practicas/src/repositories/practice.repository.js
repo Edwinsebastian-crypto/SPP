@@ -63,7 +63,7 @@ class PracticeRepository extends BaseRepository {
   }
 
   /** Creates the practice and its initial activities (the student view shows six) in one transaction. */
-  async create(data, activityCount = ACTIVITIES_PER_PRACTICE) {
+  async create(data, _activityCount = ACTIVITIES_PER_PRACTICE) {
     const id = generateId('PRA');
     const initialStatus = legacy.capitalize(legacy.practiceStatus.toStored(PRACTICE_STATUS.ACTIVE));
     await this.transaction(async (client) => {
@@ -77,6 +77,25 @@ class PracticeRepository extends BaseRepository {
       // Activities are no longer auto-created.
     });
     return id;
+  }
+
+  /** Total hours worked on a practice (sum of the hours of every evidence of every activity). */
+  async totalHours(id) {
+    const row = await this.queryOne(
+      `SELECT COALESCE(SUM(ev."horasRealizadas"), 0)::float AS total
+         FROM evidenciaactividad ev JOIN actividad a ON a."idActividad" = ev."idActividad"
+        WHERE a."idPractica" = $1`,
+      [id]
+    );
+    return Number(row && row.total) || 0;
+  }
+
+  /** Changes only the lifecycle status of a practice. */
+  setStatus(id, status) {
+    return this.execute(
+      `UPDATE practica SET ${this.#status} = $2 WHERE "idPractica" = $1`,
+      [id, legacy.capitalize(legacy.practiceStatus.toStored(status))]
+    );
   }
 
   update(id, data) {

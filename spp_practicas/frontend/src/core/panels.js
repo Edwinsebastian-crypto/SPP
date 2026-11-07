@@ -31,6 +31,14 @@ export function swap(from, to, display) {
     if (!from || !to) return;
     from.style.display = 'none';
     to.style.display = display || 'flex';
+    const filtersToolbar = byId('practice-filters-toolbar');
+    if (filtersToolbar) {
+        if (to.classList && to.classList.contains('practice-panel')) {
+            filtersToolbar.style.display = '';
+        } else if (from.classList && from.classList.contains('practice-panel')) {
+            filtersToolbar.style.display = 'none';
+        }
+    }
     resetScroll();
 }
 
@@ -202,6 +210,11 @@ export function showPanel(targetId, display) {
             el.style.display = 'none';
         }
     });
+
+    const filtersToolbar = byId('practice-filters-toolbar');
+    if (filtersToolbar) {
+        filtersToolbar.style.display = targetId === 'practice-panel' ? '' : 'none';
+    }
 
     resetScroll();
 }

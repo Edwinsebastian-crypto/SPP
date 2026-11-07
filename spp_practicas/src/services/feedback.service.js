@@ -4,8 +4,9 @@ const { AUDIT_ENTITIES, AUDIT_ACTIONS } = require('../config/constants');
 
 /** In the legacy schema feedback hangs from an EVIDENCE; the views group it by activity. */
 class FeedbackService {
-  constructor({ feedbackRepository, evidenceRepository, practiceAccessService, auditService, notificationService = null }) {
+  constructor({ feedbackRepository, evidenceRepository, practiceAccessService, auditService, notificationService = null, practiceLifecycleService = null }) {
     this.notificationService = notificationService;
+    this.lifecycle = practiceLifecycleService;
     this.feedbackRepository = feedbackRepository;
     this.evidenceRepository = evidenceRepository;
     this.access = practiceAccessService;
@@ -21,6 +22,7 @@ class FeedbackService {
   /** The assigned tutor or advisor comments on one piece of evidence of the activity. */
   async create(user, activityId, { evidenceId, text, date }) {
     const { activity, practice } = await this.access.loadAuthorizedActivity(user, activityId);
+    if (this.lifecycle) this.lifecycle.assertWritable(practice);
     const evidence = await this.evidenceRepository.findById(evidenceId);
     if (!evidence || evidence.activityId !== activity.id) throw HttpError.badRequest('The evidence does not belong to this activity');
 
@@ -37,6 +39,7 @@ class FeedbackService {
     const text = (typeof data === 'object' && data !== null) ? data.text : data;
     const date = (typeof data === 'object' && data !== null) ? data.date : undefined;
     const { practice } = await this.access.loadAuthorizedActivity(user, activityId);
+    if (this.lifecycle) this.lifecycle.assertWritable(practice);
     const feedback = await this.feedbackRepository.findById(feedbackId);
     if (!feedback) throw HttpError.notFound('Feedback not found');
     if (feedback.authorDocument !== user.documentNumber) throw HttpError.forbidden('You can only modify your own feedback');
@@ -48,6 +51,7 @@ class FeedbackService {
 
   async remove(user, activityId, feedbackId) {
     const { practice } = await this.access.loadAuthorizedActivity(user, activityId);
+    if (this.lifecycle) this.lifecycle.assertWritable(practice);
     const feedback = await this.feedbackRepository.findById(feedbackId);
     if (!feedback) throw HttpError.notFound('Feedback not found');
     if (feedback.authorDocument !== user.documentNumber) throw HttpError.forbidden('You can only delete your own feedback');

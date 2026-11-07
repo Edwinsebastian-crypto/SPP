@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { get, patch, del, showError, formatDate as apiFormatDate, EvalAPI } from '../../core/api';
+import { get, post, patch, del, showError, formatDate as apiFormatDate, EvalAPI } from '../../core/api';
 import { alert as alertModal, confirm as confirmModal } from '../../core/modals';
 import { showPanel, getPanelElement, onQuestionsBack } from '../../core/panels';
 import { sync as syncCustomSelect } from '../../core/custom-select';
@@ -9,7 +9,18 @@ import { EVENTS, emit, on } from '../../core/events';
 import { getPractice, setPractice as setPracticeStore, usePractice } from '../../core/practiceStore';
 import { provide, inject } from '../../core/registry';
 
-const STATUS_COLORS = { active: '#265c48', completed: '#6b7280', cancelled: '#b3261e' };
+const STATUS_COLORS = {
+    active: '#265c48',
+    activa: '#265c48',
+    completed: '#6b7280',
+    finalizada: '#6b7280',
+    cancelled: '#b3261e',
+    cancelada: '#b3261e',
+    evaluating: '#0284c7',
+    evaluando: '#0284c7',
+    grading: '#d97706',
+    calificando: '#d97706'
+};
 
 function computeLogbookHero(logbook) {
     const lb = logbook || {};
@@ -49,6 +60,8 @@ function computeLogbookHero(logbook) {
 }
 
 export default function PracticeAndLogbookApp({ role }) {
+    const hasPracticeFilters = role === 'director' || role === 'tutor';
+    const [filtersToolbarEl, setFiltersToolbarEl] = useState(null);
     const [practicePanelEl, setPracticePanelEl] = useState(null);
     const [logbookPanelEl, setLogbookPanelEl] = useState(null);
     const { activitiesBadges } = usePractice();
@@ -56,6 +69,12 @@ export default function PracticeAndLogbookApp({ role }) {
     const [loading, setLoading] = useState(true);
     const [practices, setPractices] = useState([]);
     const [currentPractice, setCurrentPractice] = useState(null);
+
+    // Practice filters state (Tutor & Director)
+    const [searchQuery, setSearchQuery] = useState('');
+    const [semesterFilter, setSemesterFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [evalStatesByPractice, setEvalStatesByPractice] = useState({});
 
     // Logbook state
     const [questionsPill, setQuestionsPill] = useState({
@@ -77,6 +96,10 @@ export default function PracticeAndLogbookApp({ role }) {
 
     const selectorRef = useRef(null);
     const selectorBoxRef = useRef(null);
+    const semesterFilterWrapRef = useRef(null);
+    const semesterFilterSelectRef = useRef(null);
+    const statusFilterWrapRef = useRef(null);
+    const statusFilterSelectRef = useRef(null);
     const gradeInputRef = useRef(null);
     const dirMenuRef = useRef(null);
     const practicesRef = useRef([]);
@@ -102,12 +125,26 @@ export default function PracticeAndLogbookApp({ role }) {
         if (pPanel) {
             pPanel.innerHTML = '';
             setPracticePanelEl(pPanel);
+
+            if (role === 'director' || role === 'tutor') {
+                let fBar = document.getElementById('practice-filters-toolbar');
+                if (!fBar && pPanel.parentNode) {
+                    fBar = document.createElement('div');
+                    fBar.id = 'practice-filters-toolbar';
+                    fBar.className = 'um-toolbar pf-toolbar';
+                    pPanel.parentNode.insertBefore(fBar, pPanel);
+                }
+                if (fBar) {
+                    fBar.style.display = pPanel.style.display === 'none' ? 'none' : '';
+                    setFiltersToolbarEl(fBar);
+                }
+            }
         }
         if (lPanel) {
             lPanel.innerHTML = '';
             setLogbookPanelEl(lPanel);
         }
-    }, []);
+    }, [role]);
 
     // Manage `.is-loading` class on practicePanelEl
     useEffect(() => {
@@ -433,6 +470,56 @@ export default function PracticeAndLogbookApp({ role }) {
         [role, updateQuestionsPill]
     );
 
+    // Load evaluation states per practice for Tutor & Director status filtering
+    const loadPracticeEvalStates = useCallback(async () => {
+        if (role !== 'director' && role !== 'tutor') return;
+        const evalApi = EvalAPI;
+        if (!evalApi) return;
+        try {
+            let items = [];
+            if (role === 'director' && typeof evalApi.director?.listar === 'function') {
+                const res = await evalApi.director.listar({ limite: 200 });
+                items = res?.items || (Array.isArray(res) ? res : []);
+            } else if (role === 'tutor' && typeof evalApi.tutor?.listarEvaluaciones === 'function') {
+                const res = await evalApi.tutor.listarEvaluaciones();
+                items = Array.isArray(res) ? res : res?.items || [];
+            }
+            if (!Array.isArray(items)) return;
+
+            const map = {};
+            for (const ev of items) {
+                const pid = String(ev.id_practica || '').trim();
+                if (!pid) continue;
+                if (!map[pid]) {
+                    map[pid] = { evaluating: false, grading: false };
+                }
+                const enviados = Number(ev.intentos_enviados) || 0;
+                const iniciados = Number(ev.intentos_iniciados) || 0;
+                const presentados = Number(ev.intentos_presentados) || 0;
+                const calificados = Number(ev.intentos_calificados) || 0;
+                const pendientes = Number(ev.pendientes_revision) || 0;
+
+                if (
+                    ev.estado === 'PUBLICADA' &&
+                    ((enviados === 0 && calificados === 0) || iniciados > enviados)
+                ) {
+                    map[pid].evaluating = true;
+                }
+                if (
+                    pendientes > 0 ||
+                    enviados > calificados ||
+                    presentados > calificados ||
+                    ev.estado === 'BORRADOR'
+                ) {
+                    map[pid].grading = true;
+                }
+            }
+            setEvalStatesByPractice(map);
+        } catch (_) {
+            // Non-blocking if evaluation service is unreachable
+        }
+    }, [role]);
+
     // Load practices from API
     const loadPractices = useCallback(
         async (preferredId = null) => {
@@ -442,6 +529,10 @@ export default function PracticeAndLogbookApp({ role }) {
                 setPractices(list);
                 practicesRef.current = list;
                 setLoading(false);
+
+                if (role === 'director' || role === 'tutor') {
+                    loadPracticeEvalStates();
+                }
 
                 if (role === 'student') {
                     const chosen =
@@ -466,7 +557,7 @@ export default function PracticeAndLogbookApp({ role }) {
                 showError(err);
             }
         },
-        [role, selectPractice]
+        [role, selectPractice, loadPracticeEvalStates]
     );
 
     const reloadLogbook = useCallback(async () => {
@@ -511,6 +602,9 @@ export default function PracticeAndLogbookApp({ role }) {
             if (!id) return;
             const found = practicesRef.current.find((p) => String(p.id) === String(id));
             if (found) {
+                setSearchQuery('');
+                setSemesterFilter('all');
+                setStatusFilter('all');
                 selectPractice(found);
                 if (selectorRef.current) {
                     selectorRef.current.value = String(found.id);
@@ -532,8 +626,133 @@ export default function PracticeAndLogbookApp({ role }) {
         };
     }, [loadPractices, selectPractice, role]);
 
-    // Sync customSelect for tutor/advisor/director practice selector
-    useCustomSelect([selectorBoxRef, selectorRef], [role, practices, currentPractice, practicePanelEl]);
+    // Compute filtered practices for Tutor & Director
+    const filteredPractices = useMemo(() => {
+        if (!hasPracticeFilters) return practices;
+        const todayIso = new Date().toISOString().slice(0, 10);
+        const q = searchQuery.trim().toLowerCase();
+        return practices.filter((p) => {
+            // 1. Search by student
+            if (q) {
+                const hay = [p.student, p.studentDocument, p.code, p.name]
+                    .filter(Boolean)
+                    .join(' ')
+                    .toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            // 2. Filter by semester
+            if (semesterFilter !== 'all') {
+                if (String(p.semester ?? '').trim() !== String(semesterFilter).trim()) {
+                    return false;
+                }
+            }
+            // 3. Filter by practice status [Activa, Cancelada, Finalizada, Evaluando, Calificando]
+            if (statusFilter !== 'all') {
+                const rawStatus = String(p.status || '')
+                    .trim()
+                    .toLowerCase();
+                const evState = evalStatesByPractice[String(p.id || p.code || '')] || {};
+                const endIso = p.endDate ? String(p.endDate).slice(0, 10) : '';
+                const hasFinalGrade =
+                    p.logbook && p.logbook.finalGrade != null && p.logbook.finalGrade !== '';
+                const isPastEndUnGraded = Boolean(endIso && endIso < todayIso && !hasFinalGrade);
+
+                if (statusFilter === 'active') {
+                    if (rawStatus !== 'active' && rawStatus !== 'activa') return false;
+                } else if (statusFilter === 'cancelled') {
+                    if (rawStatus !== 'cancelled' && rawStatus !== 'cancelada') return false;
+                } else if (statusFilter === 'completed') {
+                    if (rawStatus !== 'completed' && rawStatus !== 'finalizada') return false;
+                } else if (statusFilter === 'evaluating') {
+                    const matchesEval =
+                        rawStatus === 'evaluating' ||
+                        rawStatus === 'evaluando' ||
+                        ((rawStatus === 'active' || rawStatus === 'activa') &&
+                            Boolean(evState.evaluating));
+                    if (!matchesEval) return false;
+                } else if (statusFilter === 'grading') {
+                    const matchesGrading =
+                        rawStatus === 'grading' ||
+                        rawStatus === 'calificando' ||
+                        ((rawStatus === 'active' || rawStatus === 'activa') &&
+                            (Boolean(evState.grading) || isPastEndUnGraded));
+                    if (!matchesGrading) return false;
+                }
+            }
+            return true;
+        });
+    }, [
+        hasPracticeFilters,
+        practices,
+        searchQuery,
+        semesterFilter,
+        statusFilter,
+        evalStatesByPractice
+    ]);
+
+    const displayedPractices = hasPracticeFilters ? filteredPractices : practices;
+
+    // Available semesters (1..8 plus any other semester present in practices)
+    const semesterOptions = useMemo(
+        () =>
+            Array.from(
+                new Set([
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    ...practices
+                        .map((p) => Number(p.semester))
+                        .filter((n) => Number.isFinite(n) && n > 0)
+                ])
+            ).sort((a, b) => a - b),
+        [practices]
+    );
+
+    // Keep currentPractice synchronized with filteredPractices when filters change
+    useEffect(() => {
+        if (!hasPracticeFilters || loading) return;
+        if (filteredPractices.length === 0) {
+            if (currentPracticeRef.current !== null) {
+                selectPractice(null, []);
+            }
+            return;
+        }
+        const cur = currentPracticeRef.current;
+        const stillIncluded =
+            cur && filteredPractices.some((p) => String(p.id) === String(cur.id));
+        if (!stillIncluded) {
+            selectPractice(filteredPractices[0]);
+        }
+    }, [
+        hasPracticeFilters,
+        loading,
+        searchQuery,
+        semesterFilter,
+        statusFilter,
+        filteredPractices,
+        selectPractice
+    ]);
+
+    const handleClearPracticeFilters = () => {
+        setSearchQuery('');
+        setSemesterFilter('all');
+        setStatusFilter('all');
+    };
+
+    // Sync customSelect for tutor/advisor/director practice selector and filter dropdowns
+    useCustomSelect(
+        [selectorRef],
+        [role, displayedPractices, currentPractice, practicePanelEl]
+    );
+    useCustomSelect(
+        [semesterFilterSelectRef, statusFilterSelectRef],
+        [role, semesterFilter, statusFilter, semesterOptions, filtersToolbarEl]
+    );
 
     // Wire `#questionsBack` button in `#questions-panel`
     useEffect(() => {
@@ -587,8 +806,12 @@ export default function PracticeAndLogbookApp({ role }) {
         }
     };
 
+    const isReadOnly =
+        currentPractice?.status === 'completed' ||
+        currentPractice?.status === 'cancelled';
+
     const handleOpenTutorEdit = () => {
-        if (role !== 'tutor' || !currentPractice) return;
+        if (role !== 'tutor' || !currentPractice || isReadOnly) return;
         const lb = currentPractice.logbook || {};
         setGradeInput(lb.finalGrade != null && lb.finalGrade !== '' ? String(lb.finalGrade) : '');
         setObsInput(lb.generalObservation || '');
@@ -659,6 +882,30 @@ export default function PracticeAndLogbookApp({ role }) {
         }
     };
 
+    const handleCancelPracticeDirector = async () => {
+        setDirMenuOpen(false);
+        if (!currentPractice) return;
+        const confirmed = await confirmModal({
+            title: 'Cancelar práctica',
+            message:
+                '¿Estás seguro de que deseas cancelar esta práctica? Pasará a modo solo lectura y esta acción no se puede deshacer.',
+            confirmLabel: 'Cancelar práctica'
+        });
+        if (!confirmed) return;
+        try {
+            await post(`/api/practices/${currentPractice.id}/cancel`, {});
+            await loadPractices();
+            inject('reports')?.reload?.();
+            emit(EVENTS.HOME_REFRESH);
+            await alertModal({
+                title: 'Práctica cancelada',
+                message: 'La práctica ha sido cancelada correctamente.'
+            });
+        } catch (err) {
+            showError(err);
+        }
+    };
+
     const handleOpenStudentCred = () => {
         const st = getPractice().student;
         if (st) {
@@ -674,6 +921,88 @@ export default function PracticeAndLogbookApp({ role }) {
 
     return (
         <>
+            {hasPracticeFilters && filtersToolbarEl
+                ? createPortal(
+                      <>
+                          <div className="um-search">
+                              <i className="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                              <input
+                                  type="search"
+                                  id="pf-search"
+                                  placeholder="Search by student..."
+                                  aria-label="Search by student"
+                                  value={searchQuery}
+                                  onChange={(e) => setSearchQuery(e.target.value)}
+                              />
+                          </div>
+
+                          <div ref={semesterFilterWrapRef} className="cp-input-wrap um-filter-wrap">
+                              <select
+                                  ref={semesterFilterSelectRef}
+                                  id="pf-semester-filter"
+                                  aria-label="Filter by semester"
+                                  data-sheet-title="Filter by semester"
+                                  value={semesterFilter}
+                                  onChange={(e) => setSemesterFilter(e.target.value)}
+                              >
+                                  <option value="all">All</option>
+                                  {semesterOptions.map((sem) => (
+                                      <option key={sem} value={String(sem)}>
+                                          {`Semester ${sem}`}
+                                      </option>
+                                  ))}
+                              </select>
+                              <i
+                                  className="fa-solid fa-chevron-down right-icon"
+                                  aria-hidden="true"
+                              ></i>
+                          </div>
+
+                          <div ref={statusFilterWrapRef} className="cp-input-wrap um-filter-wrap">
+                              <select
+                                  ref={statusFilterSelectRef}
+                                  id="pf-status-filter"
+                                  aria-label="Filter by practice status"
+                                  data-sheet-title="Filter by practice status"
+                                  value={statusFilter}
+                                  onChange={(e) => setStatusFilter(e.target.value)}
+                              >
+                                  <option value="all">All</option>
+                                  <option value="active">Activa</option>
+                                  <option value="cancelled">Cancelada</option>
+                                  <option value="completed">Finalizada</option>
+                                  <option value="evaluating">Evaluando</option>
+                                  <option value="grading">Calificando</option>
+                              </select>
+                              <i
+                                  className="fa-solid fa-chevron-down right-icon"
+                                  aria-hidden="true"
+                              ></i>
+                          </div>
+
+                          <div className="pf-clear-group">
+                              <button
+                                  type="button"
+                                  className="um-ghost-btn"
+                                  id="pf-clear-filters"
+                                  onClick={handleClearPracticeFilters}
+                              >
+                                  <i className="fa-solid fa-rotate-left" aria-hidden="true"></i>{' '}
+                                  Clear
+                              </button>
+                              <span
+                                  className="pf-count-badge"
+                                  id="pf-filter-count"
+                                  title="Filtered practices / Total practices"
+                              >
+                                  {`${displayedPractices.length}/${practices.length}`}
+                              </span>
+                          </div>
+                      </>,
+                      filtersToolbarEl
+                  )
+                : null}
+
             {practicePanelEl
                 ? createPortal(
                       <>
@@ -751,6 +1080,23 @@ export default function PracticeAndLogbookApp({ role }) {
                                                   ></i>{' '}
                                                   Editar
                                               </button>
+                                               {currentPractice?.status !== 'cancelled' &&
+                                               currentPractice?.status !== 'completed' ? (
+                                                   <button
+                                                       type="button"
+                                                       className="ev-dropdown-item ev-item--cancel"
+                                                       id="btn-cancel-practice"
+                                                       role="menuitem"
+                                                       style={{ color: '#b3261e' }}
+                                                       onClick={handleCancelPracticeDirector}
+                                                   >
+                                                       <i
+                                                           className="fa-solid fa-ban"
+                                                           aria-hidden="true"
+                                                       ></i>{' '}
+                                                       Cancelar
+                                                   </button>
+                                               ) : null}
                                               <button
                                                   type="button"
                                                   className="ev-dropdown-item ev-item--delete"
@@ -800,10 +1146,10 @@ export default function PracticeAndLogbookApp({ role }) {
                                                   ? 'Practice to view'
                                                   : 'Assigned student'
                                           }
-                                          disabled={practices.length === 0}
+                                          disabled={displayedPractices.length === 0}
                                           value={(currentPractice && currentPractice.id) || ''}
                                           onChange={(e) => {
-                                              const next = practices.find(
+                                              const next = displayedPractices.find(
                                                   (p) => String(p.id) === String(e.target.value)
                                               );
                                               if (next) selectPractice(next);
@@ -815,8 +1161,12 @@ export default function PracticeAndLogbookApp({ role }) {
                                                       ? 'No practices have been created'
                                                       : 'You have no assigned practices'}
                                               </option>
+                                          ) : displayedPractices.length === 0 ? (
+                                              <option value="">
+                                                  No practices match the selected filters
+                                              </option>
                                           ) : (
-                                              practices.map((p) => (
+                                              displayedPractices.map((p) => (
                                                   <option key={p.id} value={p.id}>
                                                       {`${p.student} — ${p.code}`}
                                                   </option>
@@ -1084,13 +1434,13 @@ export default function PracticeAndLogbookApp({ role }) {
                           <div
                               className={`lb-hero-banner${loading ? ' is-loading' : ''}`}
                               id="lb-hero-banner"
-                              style={role === 'tutor' ? { cursor: 'pointer' } : undefined}
+                              style={role === 'tutor' && !isReadOnly ? { cursor: 'pointer' } : undefined}
                               title={
                                   role === 'tutor'
                                       ? 'Haz clic para editar la calificación y observación'
                                       : undefined
                               }
-                              onClick={role === 'tutor' ? handleOpenTutorEdit : undefined}
+                              onClick={role === 'tutor' && !isReadOnly ? handleOpenTutorEdit : undefined}
                           >
                               <div className="lb-hero-left">
                                   <div className="lb-score-ring" id="lb-score-ring">

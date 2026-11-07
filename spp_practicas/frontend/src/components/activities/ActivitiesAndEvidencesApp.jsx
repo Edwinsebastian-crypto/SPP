@@ -247,6 +247,8 @@ function DropdownMenu({ id, style, ariaLabel = 'Options', items }) {
 
 export default function ActivitiesAndEvidencesApp({ role }) {
     const [practice, setPractice] = useState(null);
+    const isPracticeReadOnly =
+        practice?.status === 'completed' || practice?.status === 'cancelled';
     const [activities, setActivities] = useState([]);
     const [activeFilter, setActiveFilter] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -950,7 +952,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                               >
                                   Activities
                               </h2>
-                              {role === 'student' && (
+                              {role === 'student' && !isPracticeReadOnly && (
                                   <button
                                       type="button"
                                       className="am-open-btn"
@@ -975,7 +977,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                                       <span>Upload evidence</span>
                                   </button>
                               )}
-                              {role === 'tutor' && (
+                              {role === 'tutor' && !isPracticeReadOnly && (
                                   <button
                                       type="button"
                                       className="am-open-btn"
@@ -1397,7 +1399,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                                   {detailTitle}
                               </h2>
 
-                              {role === 'tutor' && isTutorGenerated ? (
+                              {role === 'tutor' && isTutorGenerated && !isPracticeReadOnly ? (
                                   <DropdownMenu
                                       id="act-main-menu"
                                       style={{ marginLeft: 'auto' }}
@@ -1640,7 +1642,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                                       </div>
                                   </div>
 
-                                  {role === 'tutor' && isEditingGrade ? (
+                                  {role === 'tutor' && isEditingGrade && !isPracticeReadOnly ? (
                                       <div
                                           className="am-actions"
                                           id="act-nota-actions"
@@ -1761,7 +1763,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                                   <h3 className="feedback-title evidences-subtitle">
                                       Activity Evidence
                                   </h3>
-                                  {!isActivityClosed(currentActivity) ? (
+                                  {!isActivityClosed(currentActivity) && !isPracticeReadOnly ? (
                                       <button
                                           type="button"
                                           className="am-open-btn"
@@ -2087,7 +2089,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                                                           icon: 'fa-solid fa-pen',
                                                           className:
                                                               'ev-item--edit',
-                                                          hidden: !isOwner,
+                                                          hidden: !isOwner || isPracticeReadOnly,
                                                           onClick: () => {
                                                               setFeedbackText(
                                                                   fb.text || ''
@@ -2117,7 +2119,7 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                                                           icon: 'fa-solid fa-trash',
                                                           className:
                                                               'ev-item--delete',
-                                                          hidden: !isOwner,
+                                                          hidden: !isOwner || isPracticeReadOnly,
                                                           onClick: () =>
                                                               setConfirmDeleteConfig(
                                                                   {
@@ -2164,7 +2166,8 @@ export default function ActivitiesAndEvidencesApp({ role }) {
                               )}
 
                               {(role === 'tutor' || role === 'advisor') &&
-                              evidences.length > 0 ? (
+                              evidences.length > 0 &&
+                              !isPracticeReadOnly ? (
                                   <div className="feedback-form-section">
                                       <h4 className="feedback-form-title">
                                           {editingFeedbackId

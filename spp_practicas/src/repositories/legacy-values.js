@@ -26,7 +26,13 @@ module.exports = {
   capitalize,
   /** Role tables / user status are stored as 'activo', 'pendiente', 'inactivo'. */
   userStatus: createMapping({ active: 'activo', pending: 'pendiente', inactive: 'inactivo' }),
-  practiceStatus: createMapping({ active: 'activa', completed: 'finalizada', cancelled: 'cancelada' }),
+  practiceStatus: createMapping({
+    active: 'activa',
+    completed: 'finalizada',
+    cancelled: 'cancelada',
+    evaluating: 'evaluando',
+    grading: 'calificando'
+  }),
   auditEntity: createMapping({
     practice: 'Practica', logbook: 'Bitacora', activity: 'Actividad', evidence: 'Evidencia', feedback: 'Retroalimentacion', user: 'Usuario'
   }),

@@ -1,5 +1,5 @@
 'use strict';
-const { PRACTICE_STATUS } = require('../config/constants');
+const { OPEN_PRACTICE_STATUSES } = require('../config/constants');
 
 /**
  * Presenters shape domain objects into the JSON the views consume.
@@ -64,7 +64,7 @@ function toPracticeDto(p) {
       createdAt: p.startDate,
       finalGrade: grade > 0 ? grade : null,
       generalObservation: (p.finalObservation || '').trim() || null,
-      status: p.status === PRACTICE_STATUS.ACTIVE ? 'active' : 'closed'
+      status: OPEN_PRACTICE_STATUSES.includes(p.status) ? 'active' : 'closed'
     },
     studentDetails: {
       documentType: p.studentDocumentType,

@@ -16,8 +16,18 @@ const REGISTRABLE_ROLES = Object.freeze(['student', 'tutor', 'advisor']);
 const USER_STATUS = Object.freeze({ ACTIVE: 'active', PENDING: 'pending', INACTIVE: 'inactive' });
 const USER_STATUS_LIST = Object.freeze(Object.values(USER_STATUS));
 
-const PRACTICE_STATUS = Object.freeze({ ACTIVE: 'active', COMPLETED: 'completed', CANCELLED: 'cancelled' });
+const PRACTICE_STATUS = Object.freeze({
+  ACTIVE: 'active',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+  EVALUATING: 'evaluating',
+  GRADING: 'grading'
+});
 const PRACTICE_STATUS_LIST = Object.freeze(Object.values(PRACTICE_STATUS));
+/** Statuses in which the practice is still in progress (not finished nor cancelled). */
+const OPEN_PRACTICE_STATUSES = Object.freeze([PRACTICE_STATUS.ACTIVE, PRACTICE_STATUS.EVALUATING, PRACTICE_STATUS.GRADING]);
+/** Statuses in which the practice is read-only for every role. */
+const READ_ONLY_PRACTICE_STATUSES = Object.freeze([PRACTICE_STATUS.COMPLETED, PRACTICE_STATUS.CANCELLED]);
 
 const QUESTION_TOPICS = Object.freeze(['pedagogy', 'didactics', 'assessment']);
 const QUESTION_TYPES = Object.freeze(['open', 'multiple-choice', 'true-false']);
@@ -59,6 +69,7 @@ const UPLOAD = Object.freeze({
 
 module.exports = {
   ROLES, ROLE_LIST, REGISTRABLE_ROLES, USER_STATUS, USER_STATUS_LIST, PRACTICE_STATUS, PRACTICE_STATUS_LIST,
+  OPEN_PRACTICE_STATUSES, READ_ONLY_PRACTICE_STATUSES,
   QUESTION_TOPICS, QUESTION_TYPES, ANSWER_STATUS, DOCUMENT_TYPES,
   AUDIT_ENTITIES, AUDIT_ACTIONS, NO_PRACTICE, ACTIVITIES_PER_PRACTICE,
   COOKIES, CSRF_HEADER, UPLOAD, GOOGLE_LINK_MIME

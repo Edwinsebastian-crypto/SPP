@@ -8,6 +8,7 @@ const NOTIFICATION_TYPES = Object.freeze({
   ACTIVITY_FEEDBACK: 'ActividadRetroalimentada',
   ACTIVITY_GRADED: 'ActividadCalificada',
   PRACTICE_GRADED: 'PracticaCalificada',
+  PRACTICE_READY_TO_EVALUATE: 'PracticaPorEvaluar',
   EVALUATION_AVAILABLE: 'EvaluacionDisponible',
   EVALUATION_GRADED: 'EvaluacionCalificada',
   ACTIVITY_DUE_SOON: 'RecordatorioActividad',

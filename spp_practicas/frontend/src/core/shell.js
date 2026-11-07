@@ -239,6 +239,14 @@ function initShellDOM() {
     });
 
     document.addEventListener('click', (event) => {
+        const accountBtn = event.target.closest('.app-account');
+        if (accountBtn) {
+            event.preventDefault();
+            activateNav('#profile');
+        }
+    });
+
+    document.addEventListener('click', (event) => {
         if (!shell) return;
         if (isMobileLayout()) {
             let clickedOnMobileToggle = false;
@@ -422,6 +430,9 @@ export function updateProfileDOM(user, rolesMap) {
     if (typeof document === 'undefined' || !user) return;
     const fullName = ((user.firstName || '') + ' ' + (user.lastName || '')).trim();
 
+    document.querySelectorAll('.app-account').forEach((el) => {
+        el.setAttribute('title', 'Ver perfil');
+    });
     document.querySelectorAll('.app-account strong').forEach((el) => {
         el.textContent = fullName;
     });

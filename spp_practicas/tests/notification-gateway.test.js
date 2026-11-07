@@ -170,6 +170,7 @@ const settle = () => new Promise((r) => setTimeout(r, 15));
     const svc = new PracticeService({
       activityRepository: { create: async () => 1 },
       practiceAccessService: { loadAuthorized: async () => ({ id: 'PRA-1' }) },
+      practiceLifecycleService: { assertWritable: () => {} },
       auditService: { record: () => {} }, notificationService: service
     });
     await svc.createActivity({ role: 'tutor' }, 'PRA-1', { title: 'Actividad 1' });
@@ -201,6 +202,7 @@ const settle = () => new Promise((r) => setTimeout(r, 15));
         update: async () => {}
       },
       practiceAccessService: { loadAuthorized: async () => ({ id: 'PRA-1' }) },
+      practiceLifecycleService: { assertWritable: () => {} },
       auditService: { record: () => {} }, notificationService: service
     });
     await make(null).updateActivity({ documentNumber: 'T1', role: 'tutor', firstName: 'T', lastName: 'U' }, 'PRA-1', 'A1', { grade: 4.5 });
@@ -223,6 +225,7 @@ const settle = () => new Promise((r) => setTimeout(r, 15));
         updateLogbook: async () => {}
       },
       practiceAccessService: { loadAuthorized: async () => ({ id: 'PRA-1', finalGrade: previousGrade }) },
+      practiceLifecycleService: { assertCanGrade: () => {}, afterLogbook: async () => 'completed' },
       auditService: { record: () => {} }, notificationService: service
     });
     await make(null).updateLogbook({ role: 'tutor' }, 'PRA-1', { finalGrade: 4.8 });

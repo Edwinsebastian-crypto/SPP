@@ -1,12 +1,12 @@
 'use strict';
 const HttpError = require('../utils/http-error');
-const { ROLES, USER_STATUS, AUDIT_ENTITIES, AUDIT_ACTIONS } = require('../config/constants');
+const { ROLES, USER_STATUS, AUDIT_ENTITIES, AUDIT_ACTIONS, PRACTICE_STATUS } = require('../config/constants');
 
-/** Practice lifecycle: creation with its participants, updates, logbook (final grade) and deletion. */
+/** Practice lifecycle: creation with its participants, updates, logbook (final grade), cancellation and deletion. */
 class PracticeService {
   constructor({
     practiceRepository, activityRepository, userRepository, practiceTypeRepository, institutionRepository,
-    practiceAccessService, auditService, notificationService, fileStorage
+    practiceAccessService, auditService, notificationService, fileStorage, practiceLifecycleService
   }) {
     this.practiceRepository = practiceRepository;
     this.activityRepository = activityRepository;
@@ -17,6 +17,7 @@ class PracticeService {
     this.auditService = auditService;
     this.notificationService = notificationService;
     this.fileStorage = fileStorage;
+    this.lifecycle = practiceLifecycleService;
   }
 
   /** Practices visible to the user, according to their role. */
@@ -41,6 +42,7 @@ class PracticeService {
 
   async createActivity(user, practiceId, data = {}, files = []) {
     const practice = await this.access.loadAuthorized(user, practiceId);
+    this.lifecycle.assertWritable(practice);
     const activity = await this.activityRepository.create(practice.id, data);
     
     if (files && files.length > 0) {
@@ -58,14 +60,13 @@ class PracticeService {
 
   async updateActivity(user, practiceId, activityId, data, files) {
     const practice = await this.access.loadAuthorized(user, practiceId);
+    this.lifecycle.assertWritable(practice);
     const previousGrade = data.grade !== undefined ? Number((await this.activityRepository.findById(activityId))?.grade) || 0 : 0;
 
     // Process file deletions if keptFileIds is provided (usually when editing via modal)
     if (data.keptFileIds) {
       const keptIds = typeof data.keptFileIds === 'string' ? JSON.parse(data.keptFileIds) : data.keptFileIds;
-      const activity = await this.activityRepository.findById(activityId);
-      // Wait, activityRepository.findById only returns title, we need files. 
-      // Let's use listActivities and find the current one.
+      // activityRepository.findById only returns title, we need files: use listActivities to find current one
       const allActivities = await this.activityRepository.listByPractice(practice.id);
       const currentActivity = allActivities.find(a => String(a.id) === String(activityId));
       if (currentActivity && currentActivity.files) {
@@ -102,6 +103,7 @@ class PracticeService {
 
   async removeActivity(user, practiceId, activityId) {
     const practice = await this.access.loadAuthorized(user, practiceId);
+    this.lifecycle.assertWritable(practice);
     
     const allActivities = await this.activityRepository.listByPractice(practice.id);
     const activity = allActivities.find(a => String(a.id) === String(activityId));
@@ -164,9 +166,28 @@ class PracticeService {
   }
 
   async update(actor, id, input) {
-    if (!(await this.practiceRepository.findById(id))) throw HttpError.notFound('Practice not found');
+    const existing = await this.practiceRepository.findById(id);
+    if (!existing) throw HttpError.notFound('Practice not found');
+    // a cancelled practice is read-only; a completed one only accepts the edit that reopens it (end date)
+    if (existing.status === PRACTICE_STATUS.CANCELLED) this.lifecycle.assertWritable(existing);
     await this.#validateReferences(input);
-    await this.practiceRepository.update(id, input);
+    // the status is never taken from the form: it follows the lifecycle (a completed practice whose end date changes goes back to grading)
+    const status = this.lifecycle.statusAfterEdit(existing, input);
+    if (existing.status === PRACTICE_STATUS.COMPLETED && status === PRACTICE_STATUS.COMPLETED) {
+      throw HttpError.conflict('The practice is completed and can only be viewed (change the end date to reopen it for grading)');
+    }
+    await this.practiceRepository.update(id, { ...input, status });
+    this.auditService.record(actor, { entity: AUDIT_ENTITIES.PRACTICE, entityId: id, practiceId: id, action: AUDIT_ACTIONS.UPDATE });
+    return this.practiceRepository.findById(id);
+  }
+
+  /** The Director cancels the practice: from then on it can only be viewed. */
+  async cancel(actor, id) {
+    const practice = await this.practiceRepository.findById(id);
+    if (!practice) throw HttpError.notFound('Practice not found');
+    if (practice.status === PRACTICE_STATUS.CANCELLED) throw HttpError.conflict('The practice is already cancelled');
+    if (practice.status === PRACTICE_STATUS.COMPLETED) throw HttpError.conflict('A completed practice cannot be cancelled');
+    await this.practiceRepository.setStatus(id, PRACTICE_STATUS.CANCELLED);
     this.auditService.record(actor, { entity: AUDIT_ENTITIES.PRACTICE, entityId: id, practiceId: id, action: AUDIT_ACTIONS.UPDATE });
     return this.practiceRepository.findById(id);
   }
@@ -180,10 +201,12 @@ class PracticeService {
   /** The assigned tutor (or the director) records the final grade and a general observation. */
   async updateLogbook(actor, practiceId, input) {
     const practice = await this.access.loadAuthorized(actor, practiceId);
+    this.lifecycle.assertCanGrade(practice);
     await this.practiceRepository.updateLogbook(practice.id, input);
+    const status = await this.lifecycle.afterLogbook(practice, input);
     this.auditService.record(actor, { entity: AUDIT_ENTITIES.LOGBOOK, entityId: practice.id, practiceId: practice.id, action: AUDIT_ACTIONS.UPDATE });
     // a new final grade (> 0 and different from the stored one) -> the student is told ("0" means not graded)
-    if (input.finalGrade > 0 && Number(input.finalGrade) !== Number(practice.finalGrade) && this.notificationService) {
+    if (status === PRACTICE_STATUS.COMPLETED && input.finalGrade > 0 && Number(input.finalGrade) !== Number(practice.finalGrade) && this.notificationService) {
       this.notificationService.practiceGraded({ practiceId: practice.id });
     }
     return this.practiceRepository.findById(practice.id);

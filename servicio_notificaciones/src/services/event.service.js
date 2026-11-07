@@ -29,6 +29,7 @@ class EventService {
       'feedback.created': (d) => this.#feedbackCreated(d),
       'activity.graded': (d) => this.#activityGraded(d),
       'practice.graded': (d) => this.#practiceGraded(d),
+      'practice.ready_to_evaluate': (d) => this.#practiceReadyToEvaluate(d),
       'evaluation.published': (d) => this.#evaluationPublished(d),
       'evaluation.graded': (d) => this.#evaluationGraded(d)
     };
@@ -164,6 +165,20 @@ class EventService {
     });
     return [await this.notifications.queue({
       type: T.PRACTICE_GRADED, recipient: student, practice: p, ...n, key: `practica-calificada:${p.id}:${p.finalGrade}`
+    })];
+  }
+
+  /** El estudiante completó todas las horas: se le avisa al tutor que ya es hora de evaluar. */
+  async #practiceReadyToEvaluate(data) {
+    required(data, 'practiceId');
+    const p = await this.#loadPractice(asId(data.practiceId));
+    const tutor = p && this.#person(p, 'tutor', 'tutor');
+    if (!tutor) return ['skipped'];
+    const n = tpl.practiceReadyToEvaluate({
+      fullName: tutor.fullName, studentName: p.studentName || 'El estudiante', practiceName: p.typeName || 'Práctica pedagógica'
+    });
+    return [await this.notifications.queue({
+      type: T.PRACTICE_READY_TO_EVALUATE, recipient: tutor, practice: p, ...n, key: `practica-por-evaluar:${p.id}`
     })];
   }
 

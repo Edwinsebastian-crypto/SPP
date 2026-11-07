@@ -116,7 +116,9 @@ export default function InstitutionsApp() {
             await loadInstitutions();
             emit(EVENTS.DATA_CHANGED);
             inject('reports')?.reload?.();
-            revealCard(savedId);
+            if (isEdit) {
+                revealCard(savedId);
+            }
             await alertModal({
                 title: isEdit ? 'Institution updated' : 'Institution created',
                 message: isEdit

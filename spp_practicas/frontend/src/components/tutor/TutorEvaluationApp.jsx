@@ -16,7 +16,7 @@ import EvaluationModal from './EvaluationModal';
 import QuestionModal from './QuestionModal';
 import GenerateAIModal from './GenerateAIModal';
 import AttemptRowQuestion from './AttemptRowQuestion';
-import { EVENTS, on } from '../../core/events';
+import { EVENTS, on, emit } from '../../core/events';
 import { getPractice } from '../../core/practiceStore';
 import { provide, inject } from '../../core/registry';
 import { isPanelVisible } from '../../core/panels';
@@ -343,6 +343,8 @@ export default function TutorEvaluationApp() {
             const updated = await api.cerrar(evActual.id_evaluacion);
             setEvActual(updated);
             toast('Evaluation closed.');
+            emit(EVENTS.PRACTICES_CHANGED);
+            emit(EVENTS.HOME_REFRESH);
         } catch (e) {
             mostrarError(e);
         }

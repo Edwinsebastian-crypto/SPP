@@ -88,6 +88,11 @@ class NotificationService {
     return this.#publish('practice.graded', { practiceId });
   }
 
+  /** The student completed every required hour -> the tutor is told it is time to evaluate. */
+  practiceReadyToEvaluate({ practiceId }) {
+    return this.#publish('practice.ready_to_evaluate', { practiceId });
+  }
+
   /** The tutor published an evaluation -> the student is told it is available. @param {{evaluationId, practiceId, studentDocument, title, dueAt}} e */
   evaluationPublished({ evaluationId, practiceId, studentDocument, title, dueAt }) {
     return this.#publish('evaluation.published', { evaluationId, practiceId, studentDocument, title, dueAt });

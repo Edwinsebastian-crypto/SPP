@@ -43,11 +43,13 @@ export function useCustomSelect(target, deps = []) {
                 }
             }
         });
+    }, deps);
 
+    useEffect(() => {
         return () => {
             closeAll();
         };
-    }, deps);
+    }, []);
 }
 
 export default useCustomSelect;

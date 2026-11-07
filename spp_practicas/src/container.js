@@ -29,6 +29,7 @@ const NotificationServiceClient = require('./infrastructure/notification-service
 const AuditService = require('./services/audit.service');
 const NotificationService = require('./services/notification.service');
 const PracticeAccessService = require('./services/practice-access.service');
+const PracticeLifecycleService = require('./services/practice-lifecycle.service');
 const SessionService = require('./services/session.service');
 const AuthService = require('./services/auth.service');
 const UserService = require('./services/user.service');
@@ -76,6 +77,7 @@ function createContainer() {
     client: new NotificationServiceClient({ url: env.notificationServiceUrl, secret: env.notificationServiceSecret })
   });
   const practiceAccessService = new PracticeAccessService({ practiceRepository, activityRepository });
+  const practiceLifecycleService = new PracticeLifecycleService({ practiceRepository, notificationService });
   const sessionService = new SessionService({ identity, userRepository });
   const authService = new AuthService({ identity, userRepository });
   const userService = new UserService({ userRepository, identity, auditService, notificationService });
@@ -83,17 +85,17 @@ function createContainer() {
   const practiceTypeService = new PracticeTypeService({ practiceTypeRepository });
   const practiceService = new PracticeService({
     practiceRepository, activityRepository, userRepository, practiceTypeRepository, institutionRepository,
-    practiceAccessService, auditService, notificationService, fileStorage
+    practiceAccessService, auditService, notificationService, fileStorage, practiceLifecycleService
   });
-  const evidenceService = new EvidenceService({ evidenceRepository, practiceAccessService, fileStorage, auditService });
-  const feedbackService = new FeedbackService({ feedbackRepository, evidenceRepository, practiceAccessService, auditService, notificationService });
+  const evidenceService = new EvidenceService({ evidenceRepository, practiceAccessService, fileStorage, auditService, practiceLifecycleService });
+  const feedbackService = new FeedbackService({ feedbackRepository, evidenceRepository, practiceAccessService, auditService, notificationService, practiceLifecycleService });
   const reportService = new ReportService({ indicatorRepository, auditService });
   const homeService = new HomeService({
     practiceRepository, activityRepository, feedbackRepository, userRepository, indicatorRepository, auditService
   });
   const evaluationGatewayService = new EvaluationGatewayService({
     client: new EvaluationServiceClient({ url: env.evaluationServiceUrl, secret: env.evaluationServiceSecret }),
-    practiceAccessService, practiceRepository, notificationService
+    practiceAccessService, practiceRepository, notificationService, practiceLifecycleService
   });
 
   // ----- HTTP layer -----

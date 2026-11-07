@@ -27,6 +27,7 @@ const ETIQUETAS = {
   [T.ACTIVITY_FEEDBACK]: 'Retroalimentación',
   [T.ACTIVITY_GRADED]: 'Actividad calificada',
   [T.PRACTICE_GRADED]: 'Práctica calificada',
+  [T.PRACTICE_READY_TO_EVALUATE]: 'Hora de evaluar',
   [T.EVALUATION_AVAILABLE]: 'Nueva evaluación',
   [T.EVALUATION_GRADED]: 'Evaluación calificada',
   [T.ACTIVITY_DUE_SOON]: 'Recordatorio',

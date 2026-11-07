@@ -121,7 +121,7 @@ class InternalNotificationRepository extends BaseRepository {
          JOIN estudiante s ON s."numDocumento" = p."numDocEstudiante"
          LEFT JOIN tutor_academico t ON t."numDocumento" = p."numDocTutor"
          LEFT JOIN asesor_pedagogico ad ON ad."numDocumento" = p."numDocAsesor"
-        WHERE lower(trim(p.${statusCol})) = 'activa'
+        WHERE lower(trim(p.${statusCol})) IN ('activa', 'evaluando', 'calificando')
           AND EXISTS (SELECT 1 FROM evidenciaactividad ev WHERE ev."idActividad" = act."idActividad")
         ORDER BY p."idPractica", act."idActividad"`
     );
@@ -138,7 +138,7 @@ class InternalNotificationRepository extends BaseRepository {
          JOIN estudiante s ON s."numDocumento" = p."numDocEstudiante"
          LEFT JOIN tipopractica tp ON tp."idTipoPractica" = p."idTipoPractica"
          LEFT JOIN tutor_academico t ON t."numDocumento" = p."numDocTutor"
-        WHERE lower(trim(p.${statusCol})) = 'activa'
+        WHERE lower(trim(p.${statusCol})) IN ('activa', 'evaluando', 'calificando')
           AND COALESCE(p."notaFinal", 0) <= 0
           AND p."fechaFinal" <= (now() AT TIME ZONE $1)::date
         ORDER BY p."fechaFinal", p."idPractica"`,

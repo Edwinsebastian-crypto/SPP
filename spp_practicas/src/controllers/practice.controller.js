@@ -53,6 +53,12 @@ class PracticeController {
     res.json({ practice: toPracticeDto(practice) });
   };
 
+  /** POST /api/practices/:id/cancel  (Director) */
+  cancel = async (req, res) => {
+    const practice = await this.practiceService.cancel(req.user, textId(req.params.id));
+    res.json({ practice: toPracticeDto(practice) });
+  };
+
   /** DELETE /api/practices/:id  (Director) */
   remove = async (req, res) => {
     await this.practiceService.remove(req.user, textId(req.params.id));

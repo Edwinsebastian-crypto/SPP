@@ -33,7 +33,12 @@ function usesOverlaySheet() {
 
 // ---------------------------------------------------------------- background scroll lock
 function blockBackgroundScroll(event) {
-    if (scrollAllowEl && scrollAllowEl.contains(event.target)) return;
+    const target = event.target;
+    if (scrollAllowEl && target && scrollAllowEl.contains(target)) return;
+    if (target && typeof target.closest === 'function') {
+        const scrollableMenu = target.closest('.custom-options.open, .cp-select-sheet-list');
+        if (scrollableMenu) return;
+    }
     event.preventDefault();
 }
 
@@ -262,6 +267,8 @@ export function init(rootSelector) {
         const optionsList = document.createElement('div');
         optionsList.className = 'custom-options';
         optionsList.setAttribute('role', 'listbox');
+        optionsList.addEventListener('click', (e) => e.stopPropagation());
+        optionsList.addEventListener('mousedown', (e) => e.stopPropagation());
 
         Array.from(select.options).forEach((option) => {
             if (option.disabled && option.value === '') return;
@@ -400,10 +407,27 @@ export function rebuild(select) {
         select.parentElement.classList.remove('is-disabled');
         container.classList.remove('is-disabled');
     }
-    
+
+    const visibleOptions = Array.from(select.options).filter(
+        (option) => !(option.disabled && option.value === '')
+    );
+    const existingItems = Array.from(list.querySelectorAll('.custom-option[role="option"]'));
+    const sameOptions =
+        visibleOptions.length === existingItems.length &&
+        visibleOptions.every(
+            (opt, idx) =>
+                String(existingItems[idx].dataset.value ?? '') === String(opt.value ?? '') &&
+                existingItems[idx].textContent === opt.text
+        );
+
+    if (sameOptions && (visibleOptions.length > 0 || list.children.length > 0)) {
+        updateSelectedOptions(select);
+        return;
+    }
+
+    const prevScrollTop = list.scrollTop;
     list.innerHTML = '';
-    Array.from(select.options).forEach((option) => {
-        if (option.disabled && option.value === '') return;
+    visibleOptions.forEach((option) => {
         const item = document.createElement('div');
         item.className = 'custom-option';
         item.setAttribute('role', 'option');
@@ -425,6 +449,7 @@ export function rebuild(select) {
         empty.textContent = 'No records available';
         list.appendChild(empty);
     }
+    list.scrollTop = prevScrollTop;
     updateSelectedOptions(select);
 }
 
@@ -447,8 +472,30 @@ export function fillSelect(select, items, valueKey, textKey, placeholder) {
     rebuild(select);
 }
 
+let pointerDownInSelectMenu = false;
+
 if (typeof document !== 'undefined') {
-    document.addEventListener('click', closeAll);
+    document.addEventListener(
+        'mousedown',
+        (e) => {
+            const t = e.target;
+            pointerDownInSelectMenu = Boolean(
+                t && typeof t.closest === 'function' && t.closest('.custom-options, .cp-select-sheet')
+            );
+        },
+        true
+    );
+    document.addEventListener('click', (e) => {
+        if (pointerDownInSelectMenu) {
+            pointerDownInSelectMenu = false;
+            return;
+        }
+        const t = e.target;
+        if (t && typeof t.closest === 'function' && t.closest('.custom-options, .cp-select-sheet')) {
+            return;
+        }
+        closeAll();
+    });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });
     window.addEventListener('resize', () => { if (!usesOverlaySheet()) closeSheet(); });
 }

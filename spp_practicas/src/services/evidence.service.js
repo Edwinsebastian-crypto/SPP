@@ -8,11 +8,12 @@ const { AUDIT_ENTITIES, AUDIT_ACTIONS, ROLES } = require('../config/constants');
  * and its file (URL, name and MIME type).
  */
 class EvidenceService {
-  constructor({ evidenceRepository, practiceAccessService, fileStorage, auditService }) {
+  constructor({ evidenceRepository, practiceAccessService, fileStorage, auditService, practiceLifecycleService }) {
     this.evidenceRepository = evidenceRepository;
     this.access = practiceAccessService;
     this.fileStorage = fileStorage;
     this.auditService = auditService;
+    this.lifecycle = practiceLifecycleService;
   }
 
   #assertActivityNotClosed(activity) {
@@ -37,6 +38,7 @@ class EvidenceService {
   /** @param {{files: object[], links: object[], description: string, hours: number}} input */
   async upload(user, activityId, { files, links = [], description, hours }) {
     const { activity, practice } = await this.access.loadAuthorizedActivity(user, activityId);
+    this.lifecycle.assertWritable(practice);
     if (user.role === ROLES.STUDENT) {
       this.#assertActivityNotClosed(activity);
     }
@@ -61,6 +63,7 @@ class EvidenceService {
       throw err;
     }
     this.auditService.record(user, { entity: AUDIT_ENTITIES.EVIDENCE, entityId: id, practiceId: practice.id, action: AUDIT_ACTIONS.INSERT });
+    await this.lifecycle.syncHours(practice.id);
     return this.evidenceRepository.findById(id);
   }
 
@@ -73,6 +76,7 @@ class EvidenceService {
 
   async update(user, evidenceId, { description, hours, newFiles, newLinks = [], keptFileIds }) {
     const { evidence, practice } = await this.#loadAuthorized(user, evidenceId);
+    this.lifecycle.assertWritable(practice);
     if (user.role === ROLES.STUDENT) {
       this.#assertActivityNotClosed(evidence);
     }
@@ -102,11 +106,13 @@ class EvidenceService {
 
     await this.evidenceRepository.update(evidence.id, description, hours);
     this.auditService.record(user, { entity: AUDIT_ENTITIES.EVIDENCE, entityId: evidence.id, practiceId: practice.id, action: AUDIT_ACTIONS.UPDATE });
+    await this.lifecycle.syncHours(practice.id);
     return this.evidenceRepository.findById(evidence.id);
   }
 
   async remove(user, evidenceId) {
     const { evidence, practice } = await this.#loadAuthorized(user, evidenceId);
+    this.lifecycle.assertWritable(practice);
     if (user.role === ROLES.STUDENT) {
       this.#assertActivityNotClosed(evidence);
     }
@@ -120,6 +126,7 @@ class EvidenceService {
       }
     }
     this.auditService.record(user, { entity: AUDIT_ENTITIES.EVIDENCE, entityId: evidence.id, practiceId: practice.id, action: AUDIT_ACTIONS.DELETE });
+    await this.lifecycle.syncHours(practice.id);
   }
 }
 

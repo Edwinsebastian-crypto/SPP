@@ -303,21 +303,30 @@ export function buildSheet(options) {
     const sheet = h('div', { class: 'rp-sheet dv-wrapper', 'aria-hidden': 'true' },
         h('header', { class: 'rp-sheet-head' }, h('h1', {}, options.title), h('p', {}, [options.subtitle, 'Generated ' + dateTime(new Date().toISOString())].filter(Boolean).join(' · '))));
     const kpiNodes = [];
-    const cardNodes = [];
+    const regularCardNodes = [];
+    const wideCardNodes = [];
     options.datasets.forEach((d) => {
         if (mode === 'panel' && d.node) {
             const copy = d.node.cloneNode(true);
             copy.querySelectorAll('.dv-toggle, .rp-tableview').forEach((n) => n.remove());
             copy.querySelectorAll('.rp-chart[hidden]').forEach((n) => { n.hidden = false; });
             copy.querySelectorAll('[tabindex]').forEach((n) => n.removeAttribute('tabindex'));
-            (copy.classList.contains('rp-kpis') ? kpiNodes : cardNodes).push(copy);
+            if (copy.classList.contains('rp-kpis')) {
+                kpiNodes.push(copy);
+            } else if (copy.classList.contains('dv-card--wide') || copy.querySelector('table')) {
+                copy.classList.add('rp-sheet-table');
+                wideCardNodes.push(copy);
+            } else {
+                regularCardNodes.push(copy);
+            }
         } else {
-            cardNodes.push(h('article', { class: 'dv-card dv-card--wide rp-sheet-table' }, h('div', { class: 'dv-card-head' }, h('h3', {}, d.title)),
+            wideCardNodes.push(h('article', { class: 'dv-card dv-card--wide rp-sheet-table' }, h('div', { class: 'dv-card-head' }, h('h3', {}, d.title)),
                 table(d.columns.map((c) => Object.assign({}, c, { num: c.num })), d.rows)));
         }
     });
     kpiNodes.forEach((n) => sheet.appendChild(n));
-    if (cardNodes.length) sheet.appendChild(h('div', { class: 'dv-grid rp-sheet-grid' }, cardNodes));
+    if (regularCardNodes.length) sheet.appendChild(h('div', { class: 'dv-grid rp-sheet-grid' }, regularCardNodes));
+    wideCardNodes.forEach((n) => sheet.appendChild(n));
     return sheet;
 }
 
@@ -327,7 +336,8 @@ export function printSheet(options) {
     const sheet = buildSheet(options);
     document.body.appendChild(sheet);
     document.body.classList.add('rp-printing');
-    const page = h('style', {}, '@page { size: A4 ' + (options.mode === 'tables' ? 'landscape' : 'portrait') + '; margin: 12mm; }');
+    const orientation = options.orientation || (options.mode === 'tables' ? 'landscape' : 'portrait');
+    const page = h('style', {}, '@page { size: A4 ' + orientation + '; margin: 8mm 10mm; }');
     document.head.appendChild(page);
     const originalTitle = document.title;
     document.title = 'SPP ' + options.title;

@@ -117,7 +117,7 @@ class IndicatorRepository extends BaseRepository {
 
     const practices = rows.map((row) => ({
       ...row,
-      status: legacy.practiceStatus.fromStored(row.status),
+      status: (['evaluating', 'grading'].includes(legacy.practiceStatus.fromStored(row.status)) ? 'active' : legacy.practiceStatus.fromStored(row.status)),
       studentStatus: legacy.userStatus.fromStored(row.studentStatus)
     }));
     return buildIndicators({ year, programs, practices });
@@ -177,7 +177,7 @@ class IndicatorRepository extends BaseRepository {
     const advisorDocument = schema.column('retroalimentacion_a', 'numdocasesor');
     const programColumn = schema.column('estudiante', 'idprograma');
     const S = `lower(trim(p.${status}))`;
-    const ACTIVE = `'${legacy.practiceStatus.toStored('active')}'`;
+    const ACTIVE = `(${['active', 'evaluating', 'grading'].map((k) => `'${legacy.practiceStatus.toStored(k)}'`).join(', ')})`;
     const COMPLETED = `'${legacy.practiceStatus.toStored('completed')}'`;
     const CANCELLED = `'${legacy.practiceStatus.toStored('cancelled')}'`;
     const months = lastMonths(new Date(), 12);
@@ -205,7 +205,7 @@ class IndicatorRepository extends BaseRepository {
       institutionTotal, institutionRows, totalStudents
     ] = await Promise.all([
       one(`SELECT COUNT(*)::int AS total,
-                  COUNT(*) FILTER (WHERE ${S} = ${ACTIVE})::int AS active,
+                  COUNT(*) FILTER (WHERE ${S} IN ${ACTIVE})::int AS active,
                   COUNT(*) FILTER (WHERE ${S} = ${COMPLETED})::int AS completed,
                   COUNT(*) FILTER (WHERE ${S} = ${CANCELLED})::int AS cancelled,
                   COUNT(*) FILTER (WHERE p."notaFinal" > 0)::int AS graded,
@@ -235,7 +235,7 @@ class IndicatorRepository extends BaseRepository {
       many(`SELECT COALESCE(tp.nombre, 'No type') AS name, tp."numSemestre" AS semester, COALESCE(tp."horasRequeridas", 0)::int AS "requiredHours",
                    COUNT(*)::int AS practices, COUNT(DISTINCT p."numDocEstudiante")::int AS students,
                    COALESCE(ROUND(100.0 * COUNT(*) / NULLIF(SUM(COUNT(*)) OVER (), 0), 1), 0)::float AS percent,
-                   COUNT(*) FILTER (WHERE ${S} = ${ACTIVE})::int AS active,
+                   COUNT(*) FILTER (WHERE ${S} IN ${ACTIVE})::int AS active,
                    COUNT(*) FILTER (WHERE ${S} = ${COMPLETED})::int AS completed,
                    COUNT(*) FILTER (WHERE ${S} = ${CANCELLED})::int AS cancelled,
                    ${avgGrade} AS "averageGrade", ${approval} AS "approvalRate"
@@ -244,8 +244,8 @@ class IndicatorRepository extends BaseRepository {
       one(`SELECT COUNT(*)::int AS total,
                   COUNT(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM actividad a JOIN evidenciaactividad ev ON ev."idActividad" = a."idActividad"
                     WHERE a."idPractica" = p."idPractica"))::int AS "withoutEvidence",
-                  COUNT(*) FILTER (WHERE ${S} = ${ACTIVE})::int AS active,
-                  COUNT(*) FILTER (WHERE ${S} <> ${ACTIVE})::int AS closed
+                  COUNT(*) FILTER (WHERE ${S} IN ${ACTIVE})::int AS active,
+                  COUNT(*) FILTER (WHERE ${S} NOT IN ${ACTIVE})::int AS closed
              FROM practica p`),
       one(`WITH act AS (
              SELECT COALESCE(ac."notaObtenida", 0) AS grade,
@@ -263,19 +263,19 @@ class IndicatorRepository extends BaseRepository {
       many(`SELECT p."idPractica" AS code, e.nombre || ' ' || e.apellido AS student, COALESCE(i.nombre, 'No institution') AS institution,
                    p."fechaFinal" AS "endDate", (p."fechaFinal" - CURRENT_DATE)::int AS "daysLeft"
               FROM practica p ${studentJoin} ${institutionJoin}
-             WHERE ${S} = ${ACTIVE} AND p."fechaFinal" >= CURRENT_DATE AND p."fechaFinal" <= CURRENT_DATE + 30
+             WHERE ${S} IN ${ACTIVE} AND p."fechaFinal" >= CURRENT_DATE AND p."fechaFinal" <= CURRENT_DATE + 30
              ORDER BY p."fechaFinal", p."idPractica" LIMIT 100`),
       many(`SELECT p."idPractica" AS code, e.nombre || ' ' || e.apellido AS student, COALESCE(i.nombre, 'No institution') AS institution,
                    p."fechaFinal" AS "endDate", (CURRENT_DATE - p."fechaFinal")::int AS "daysOverdue"
               FROM practica p ${studentJoin} ${institutionJoin}
-             WHERE ${S} = ${ACTIVE} AND p."fechaFinal" < CURRENT_DATE
+             WHERE ${S} IN ${ACTIVE} AND p."fechaFinal" < CURRENT_DATE
              ORDER BY p."fechaFinal", p."idPractica" LIMIT 100`),
       many(`SELECT p."idPractica" AS code, e.nombre || ' ' || e.apellido AS student,
                    COALESCE(SUM(ev."horasRealizadas"), 0)::int AS logged, COALESCE(tp."horasRequeridas", 0)::int AS required
               FROM practica p ${studentJoin} LEFT JOIN tipopractica tp ON tp."idTipoPractica" = p."idTipoPractica"
               LEFT JOIN actividad ac ON ac."idPractica" = p."idPractica"
               LEFT JOIN evidenciaactividad ev ON ev."idActividad" = ac."idActividad"
-             WHERE ${S} = ${ACTIVE}
+             WHERE ${S} IN ${ACTIVE}
              GROUP BY p."idPractica", e.nombre, e.apellido, tp."horasRequeridas"`),
       one(`SELECT (SELECT COUNT(*)::int FROM retroalimentacion_t rt JOIN evidenciaactividad ev ON ev."idEvidencia" = rt."idEvidencia"
                     JOIN actividad a ON a."idActividad" = ev."idActividad" JOIN practica p ON p."idPractica" = a."idPractica") AS tutor,
@@ -308,9 +308,9 @@ class IndicatorRepository extends BaseRepository {
                    i.encargado AS manager, i."correoInstitucion" AS email,
                    COUNT(*)::int AS practices,
                    COUNT(DISTINCT p."numDocEstudiante")::int AS students,
-                   COUNT(DISTINCT p."numDocEstudiante") FILTER (WHERE ${S} = ${ACTIVE})::int AS "activeStudents",
+                   COUNT(DISTINCT p."numDocEstudiante") FILTER (WHERE ${S} IN ${ACTIVE})::int AS "activeStudents",
                    COUNT(DISTINCT p."numDocEstudiante") FILTER (WHERE ${S} = ${COMPLETED})::int AS "completedStudents",
-                   COUNT(*) FILTER (WHERE ${S} = ${ACTIVE})::int AS "activePractices",
+                   COUNT(*) FILTER (WHERE ${S} IN ${ACTIVE})::int AS "activePractices",
                    COUNT(*) FILTER (WHERE ${S} = ${COMPLETED})::int AS "completedPractices",
                    ${avgGrade} AS "averageGrade"
               FROM practica p ${institutionJoin}
@@ -433,7 +433,7 @@ class IndicatorRepository extends BaseRepository {
     const active = legacy.userStatus.toStored('active');
     return this.queryOne(
       `SELECT (SELECT COUNT(*)::int FROM practica) AS practices,
-              (SELECT COUNT(*)::int FROM practica WHERE lower(trim(${status})) = '${legacy.practiceStatus.toStored('active')}') AS "activePractices",
+              (SELECT COUNT(*)::int FROM practica WHERE lower(trim(${status})) IN ('activa', 'evaluando', 'calificando')) AS "activePractices",
               (SELECT COUNT(*)::int FROM estudiante WHERE lower(trim(estado)) = '${active}') AS students,
               (SELECT COUNT(*)::int FROM tutor_academico WHERE lower(trim(estado)) = '${active}') AS tutors,
               (SELECT COUNT(*)::int FROM asesor_pedagogico WHERE lower(trim(estado)) = '${active}') AS advisors,

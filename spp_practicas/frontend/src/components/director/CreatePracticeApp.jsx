@@ -200,7 +200,11 @@ export default function CreatePracticeApp() {
                 savedId = created && created.practice ? created.practice.id : null;
             }
 
-            emit(EVENTS.PRACTICES_CHANGED, { id: savedId });
+            if (isEdit) {
+                emit(EVENTS.PRACTICES_CHANGED, { id: savedId });
+            } else {
+                emit(EVENTS.PRACTICES_CHANGED);
+            }
             emit(EVENTS.DATA_CHANGED);
             emit(EVENTS.HOME_REFRESH);
             inject('reports')?.reload?.();
@@ -212,7 +216,7 @@ export default function CreatePracticeApp() {
             await alertModal({ title, message: msg });
 
             resetForm();
-            if (savedId) {
+            if (isEdit && savedId) {
                 activateNav('#practice');
                 resetScroll();
             }

@@ -15,6 +15,7 @@ function createPracticesRoutes({ controllers: { practice }, guard }) {
   router.post('/', director, asyncHandler(practice.create));
   router.get('/:id', authenticated, asyncHandler(practice.get));
   router.put('/:id', director, asyncHandler(practice.update));
+  router.post('/:id/cancel', director, asyncHandler(practice.cancel));
   router.delete('/:id', director, asyncHandler(practice.remove));
 
   // the final grade is recorded by the assigned tutor (or the director)

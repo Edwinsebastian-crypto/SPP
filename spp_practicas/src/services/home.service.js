@@ -1,5 +1,8 @@
 'use strict';
-const { ROLES, PRACTICE_STATUS, USER_STATUS } = require('../config/constants');
+const { ROLES, PRACTICE_STATUS, USER_STATUS, OPEN_PRACTICE_STATUSES } = require('../config/constants');
+
+/** active / evaluating / grading: the practice is still in progress. */
+const isOpen = (status) => OPEN_PRACTICE_STATUSES.includes(status);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const QUEUE_LIMIT = 50;
@@ -140,7 +143,7 @@ class HomeService {
   async #student(user) {
     const now = this.now();
     const practices = await this.practiceRepository.list({ studentDocument: user.documentNumber });
-    const practice = practices.find((p) => p.status === PRACTICE_STATUS.ACTIVE) || practices[0] || null;
+    const practice = practices.find((p) => isOpen(p.status)) || practices[0] || null;
     if (!practice) return { practice: null };
 
     const activities = await this.activityRepository.listByPractice(practice.id);
@@ -172,7 +175,7 @@ class HomeService {
       const reviewer = await this.#reviewerCounts(user.role, activities);
       return { practice, ...this.#analyze(activities, reviewer, now) };
     }));
-    const active = loaded.filter((l) => l.practice.status === PRACTICE_STATUS.ACTIVE);
+    const active = loaded.filter((l) => isOpen(l.practice.status));
 
     const queueAll = active.flatMap((l) => l.items.filter((i) => i.status === 'review')
       .map((i) => ({ practiceId: l.practice.id, student: l.practice.studentName || '', activityId: i.id, title: i.title, evidenceCount: i.evidenceCount })));
@@ -183,7 +186,7 @@ class HomeService {
     const cards = loaded.map((l) => ({
       ...this.#practiceCard(l.practice, l.workedHours, now),
       pendingReview: l.counts.review, pendingTasks: l.counts.pending
-    })).sort((a, b) => (a.status === PRACTICE_STATUS.ACTIVE ? 0 : 1) - (b.status === PRACTICE_STATUS.ACTIVE ? 0 : 1)
+    })).sort((a, b) => (isOpen(a.status) ? 0 : 1) - (isOpen(b.status) ? 0 : 1)
       || String(a.endDate).localeCompare(String(b.endDate)));
 
     return {
@@ -213,7 +216,7 @@ class HomeService {
     ]);
 
     const byStatus = (s) => practices.filter((p) => p.status === s);
-    const active = byStatus(PRACTICE_STATUS.ACTIVE);
+    const active = practices.filter((p) => isOpen(p.status));
     const withActive = new Set(active.map((p) => p.studentDocument));
 
     const endingSoon = active
