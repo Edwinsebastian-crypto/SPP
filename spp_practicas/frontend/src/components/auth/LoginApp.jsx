@@ -135,21 +135,31 @@ export default function LoginApp() {
                         className="btn-submit"
                         type="submit"
                         disabled={submitting}
+                        aria-busy={submitting}
                     >
-                        <span>Enter</span>
-                        <svg
-                            className="btn-arrow"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                        >
-                            <line x1="4" y1="12" x2="20" y2="12" />
-                            <polyline points="14 6 20 12 14 18" />
-                        </svg>
+                        {submitting ? (
+                            <span className="btn-loading-content">
+                                <i className="fa-solid fa-spinner fa-spin btn-spinner" aria-hidden="true" />
+                                <span>Loading...</span>
+                            </span>
+                        ) : (
+                            <>
+                                <span>Enter</span>
+                                <svg
+                                    className="btn-arrow"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                >
+                                    <line x1="4" y1="12" x2="20" y2="12" />
+                                    <polyline points="14 6 20 12 14 18" />
+                                </svg>
+                            </>
+                        )}
                     </button>
                     <p className="auth-switch">
                         Don&apos;t have an account?{' '}

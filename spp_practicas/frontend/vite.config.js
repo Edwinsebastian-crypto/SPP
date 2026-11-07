@@ -23,8 +23,22 @@ export default defineConfig({
       output: {
         format: 'es',
         entryFileNames: '[name].js',
-        chunkFileNames: 'chunks/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash][extname]'
+        chunkFileNames: 'chunks/[name].js',
+        assetFileNames: 'assets/[name][extname]',
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
+              return 'vendor-react';
+            }
+            return 'vendor';
+          }
+          if (id.includes('components/common/') || id.includes('components\\common\\')) {
+            return 'common-ui';
+          }
+          if (id.includes('src/core/') || id.includes('src\\core\\')) {
+            return 'core-shared';
+          }
+        }
       }
     }
   },
