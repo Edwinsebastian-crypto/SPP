@@ -1,4 +1,4 @@
-# Monolito SPP · Sistema de Prácticas Pedagógicas
+# Monolito SPP · Software de Prácticas Pedagógicas
 
 Servicio central del ecosistema SPP encargado de la gestión integral, seguimiento pedagógico, registro de actividades y control administrativo de las prácticas académicas universitarias.
 
