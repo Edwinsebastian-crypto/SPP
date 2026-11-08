@@ -6,7 +6,7 @@ from ..config import Settings, get_settings
 router = APIRouter(tags=["Meta"])
 
 
-@router.get("/health")
+@router.api_route("/health", methods=["GET", "HEAD"])
 def health(s: Settings = Depends(get_settings)):
     proveedor = s.llm_effective
     return {
