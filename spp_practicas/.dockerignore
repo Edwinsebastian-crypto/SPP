@@ -1,8 +1,0 @@
-node_modules
-frontend/node_modules
-.env
-tests
-public/dist
-.git
-.github
-*.log
