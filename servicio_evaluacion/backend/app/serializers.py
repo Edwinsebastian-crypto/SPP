@@ -61,7 +61,9 @@ def intento_estudiante(i: IntentoEvaluacion) -> IntentoEstudiante:
             es_correcta=r.es_correcta if revelar else None,
             nota_obtenida=r.nota_obtenida if revelar else None,
             pendiente_revision=cerrado and pregunta_pendiente(p, r),
-            retroalimentacion=[x.comentario for x in r.retros] if cerrado else [],
+            retroalimentacion=[x.comentario for x in (r.retros if r else [])] if cerrado else [],
+            retros=[{"id_retro_pregunta": x.id_retro_pregunta, "comentario": x.comentario, "fecha": x.fecha}
+                    for x in (r.retros if r else [])] if cerrado else [],
         ))
     return IntentoEstudiante(
         id_intento=i.id_intento, id_evaluacion=ev.id_evaluacion, titulo=ev.titulo,

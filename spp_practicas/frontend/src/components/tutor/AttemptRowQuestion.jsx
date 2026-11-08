@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
     TIPOS,
     nota,
+    fecha,
     toast,
     mostrarError,
     getEvalAPI,
 } from '../../utils/evalBridge';
-import { Badge, BusyButton } from '../common/Badge';
+import { Badge, BusyButton, Icon } from '../common/Badge';
 
 export default function AttemptRowQuestion({ r, index, onUpdatedIntento }) {
     const abierta = r.tipo_pregunta === 'ABIERTA';
@@ -125,8 +126,27 @@ export default function AttemptRowQuestion({ r, index, onUpdatedIntento }) {
                 </div>
             ) : null}
             {(r.retros || []).map((x, idx) => (
-                <div key={x.id_retro || idx} className="ev-retro">
+                <div
+                    key={x.id_retro || x.id_retro_pregunta || idx}
+                    className="ev-retro"
+                    style={{ marginTop: 10 }}
+                >
+                    <Icon name="fa-solid fa-comment-dots" />
+                    <b style={{ marginLeft: 6 }}>
+                        Tutor feedback:{' '}
+                    </b>
                     {x.comentario}
+                    {x.fecha ? (
+                        <small
+                            style={{
+                                display: 'block',
+                                opacity: 0.7,
+                                marginTop: 3,
+                            }}
+                        >
+                            {fecha(x.fecha)}
+                        </small>
+                    ) : null}
                 </div>
             ))}
             {r.id_respuesta ? (

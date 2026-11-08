@@ -246,6 +246,7 @@ class RespuestaEstudiante(BaseModel):
     nota_obtenida: float | None = None       # solo al revelar
     pendiente_revision: bool = False
     retroalimentacion: list[str] = []
+    retros: list[dict] = []
 
 
 class RespuestaIn(BaseModel):

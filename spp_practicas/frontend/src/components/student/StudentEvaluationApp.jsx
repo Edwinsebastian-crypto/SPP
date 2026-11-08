@@ -951,12 +951,34 @@ export default function StudentEvaluationApp() {
                                         {p.explicacion}
                                     </div>
                                 ) : null}
-                                {(r.retroalimentacion || []).map((t, idx) => (
-                                    <div key={idx} className="ev-retro">
-                                        <b>Your tutor: </b>
-                                        {t}
-                                    </div>
-                                ))}
+                                {(r.retros && r.retros.length > 0 ? r.retros : (r.retroalimentacion || [])).map((t, idx) => {
+                                    const comentario = typeof t === 'string' ? t : t.comentario;
+                                    const fechaRetro = typeof t === 'object' && t ? t.fecha : null;
+                                    return (
+                                        <div
+                                            key={t.id_retro || t.id_retro_pregunta || idx}
+                                            className="ev-retro"
+                                            style={{ marginTop: 10 }}
+                                        >
+                                            <Icon name="fa-solid fa-comment-dots" />
+                                            <b style={{ marginLeft: 6 }}>
+                                                Tutor feedback:{' '}
+                                            </b>
+                                            {comentario}
+                                            {fechaRetro ? (
+                                                <small
+                                                    style={{
+                                                        display: 'block',
+                                                        opacity: 0.7,
+                                                        marginTop: 3,
+                                                    }}
+                                                >
+                                                    {fecha(fechaRetro)}
+                                                </small>
+                                            ) : null}
+                                        </div>
+                                    );
+                                })}
                             </article>
                         );
                     })}
