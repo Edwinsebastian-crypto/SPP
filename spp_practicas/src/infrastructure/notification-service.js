@@ -16,7 +16,7 @@ const b64url = (input) => Buffer.from(input).toString('base64url');
  */
 class NotificationServiceClient {
   /** @param {{url: string, secret: string, timeoutMs?: number, fetchImpl?: Function, now?: () => number, logger?: object}} options */
-  constructor({ url, secret, timeoutMs = 5000, fetchImpl = globalThis.fetch, now = () => Date.now(), logger = console }) {
+  constructor({ url, secret, timeoutMs = 35000, fetchImpl = globalThis.fetch, now = () => Date.now(), logger = console }) {
     this.baseUrl = String(url || '').replace(/\/+$/, '');
     this.secret = secret || '';
     this.timeoutMs = timeoutMs;

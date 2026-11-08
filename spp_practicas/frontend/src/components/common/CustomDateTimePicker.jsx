@@ -160,32 +160,41 @@ export default function CustomDateTimePicker({
         // If element is removed from DOM or hidden
         if (rect.width === 0 && rect.height === 0) return;
 
-        const estimatedHeight = isDateTime ? 405 : 345;
-        const estimatedWidth = isDateTime ? 440 : 290;
+        const popupEl = popupRef.current;
+        const actualHeight = popupEl ? popupEl.offsetHeight : (isDateTime ? 330 : 280);
+        const actualWidth = popupEl ? popupEl.offsetWidth : (isDateTime ? 390 : 255);
 
         const spaceBelow = window.innerHeight - rect.bottom;
         const spaceAbove = rect.top;
 
         let placeAbove = false;
-        if (spaceBelow < estimatedHeight && spaceAbove > spaceBelow) {
+        if (spaceBelow < actualHeight + 10 && spaceAbove > spaceBelow) {
             placeAbove = true;
         }
 
         let left = rect.left;
-        if (left + estimatedWidth > window.innerWidth - 12) {
-            left = Math.max(12, window.innerWidth - estimatedWidth - 12);
+        if (left + actualWidth > window.innerWidth - 12) {
+            left = Math.max(12, window.innerWidth - actualWidth - 12);
         }
         if (left < 12) left = 12;
 
         if (placeAbove) {
+            let bottom = Math.max(12, Math.round(window.innerHeight - rect.top + 6));
+            if (window.innerHeight - bottom - actualHeight < 12) {
+                bottom = Math.max(12, window.innerHeight - actualHeight - 12);
+            }
             setCoords({
                 top: null,
-                bottom: Math.max(12, Math.round(window.innerHeight - rect.top + 6)),
+                bottom: Math.round(bottom),
                 left: Math.round(left),
             });
         } else {
+            let top = Math.round(rect.bottom + 6);
+            if (top + actualHeight > window.innerHeight - 12) {
+                top = Math.max(12, window.innerHeight - actualHeight - 12);
+            }
             setCoords({
-                top: Math.round(rect.bottom + 6),
+                top: Math.round(top),
                 bottom: null,
                 left: Math.round(left),
             });
@@ -767,13 +776,13 @@ export default function CustomDateTimePicker({
                     position: fixed;
                     z-index: 9999999;
                     background: #ffffff;
-                    border-radius: 18px;
+                    border-radius: 14px;
                     border: 1px solid rgba(0, 0, 0, 0.08);
-                    box-shadow: 0 16px 45px rgba(0, 0, 0, 0.22), 0 4px 14px rgba(0, 0, 0, 0.08);
-                    padding: 14px 16px;
+                    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.22), 0 4px 12px rgba(0, 0, 0, 0.08);
+                    padding: 10px 14px;
                     display: flex;
                     flex-direction: column;
-                    gap: 10px;
+                    gap: 7px;
                     animation: cdpFadeIn .18s ease-out;
                     box-sizing: border-box;
                 }
@@ -797,35 +806,69 @@ export default function CustomDateTimePicker({
                         padding-top: 8px;
                     }
                 }
+                @media (max-height: 768px) {
+                    .cdp-popup {
+                        padding: 7px 11px;
+                        gap: 5px;
+                    }
+                    .cdp-calendar {
+                        width: 215px !important;
+                        gap: 4px !important;
+                    }
+                    .cdp-day-btn {
+                        height: 24px !important;
+                        font-size: 11.5px !important;
+                    }
+                    .cdp-time-columns {
+                        height: 160px !important;
+                        gap: 4px !important;
+                    }
+                    .cdp-time-col {
+                        max-height: 160px !important;
+                        width: 42px !important;
+                        gap: 3px !important;
+                    }
+                    .cdp-period-col {
+                        width: 46px !important;
+                    }
+                    .cdp-time-item {
+                        height: 23px !important;
+                        min-height: 23px !important;
+                        font-size: 11px !important;
+                    }
+                    .cdp-footer {
+                        padding-top: 5px !important;
+                    }
+                }
                 @keyframes cdpFadeIn {
                     from { opacity: 0; transform: translateY(-6px); }
                     to { opacity: 1; transform: translateY(0); }
                 }
                 .cdp-body {
                     display: flex;
-                    gap: 16px;
+                    gap: 12px;
                 }
                 .cdp-calendar {
-                    width: 252px;
+                    width: 230px;
                     display: flex;
                     flex-direction: column;
-                    gap: 10px;
+                    gap: 6px;
                 }
                 .cdp-header {
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
-                    padding: 2px 4px 6px;
+                    padding: 0 4px 4px;
                     border-bottom: 1px solid rgba(0, 0, 0, 0.06);
                 }
                 .cdp-month-selector-btn {
                     display: inline-flex;
                     align-items: center;
-                    gap: 6px;
+                    gap: 5px;
                     border: none;
                     background: transparent;
-                    padding: 4px 8px;
-                    border-radius: 8px;
+                    padding: 2px 6px;
+                    border-radius: 6px;
                     cursor: pointer;
                     transition: background .15s ease;
                 }
@@ -840,9 +883,9 @@ export default function CustomDateTimePicker({
                 .cdp-month-picker-view {
                     display: flex;
                     flex-direction: column;
-                    gap: 12px;
-                    padding: 6px 0;
-                    min-height: 220px;
+                    gap: 10px;
+                    padding: 4px 0;
+                    min-height: 180px;
                     justify-content: center;
                 }
                 .cdp-year-bar {
@@ -852,23 +895,23 @@ export default function CustomDateTimePicker({
                     padding: 0 8px;
                 }
                 .cdp-year-display {
-                    font-size: 15px;
+                    font-size: 14.5px;
                     font-weight: 700;
                     color: #103323;
                 }
                 .cdp-month-grid {
                     display: grid;
                     grid-template-columns: repeat(3, 1fr);
-                    gap: 8px;
-                    padding: 4px;
+                    gap: 6px;
+                    padding: 3px;
                 }
                 .cdp-month-chip {
-                    padding: 9px 4px;
+                    padding: 7px 4px;
                     border: none;
-                    border-radius: 9px;
+                    border-radius: 7px;
                     background: #f5f8f6;
                     color: #103323;
-                    font-size: 13px;
+                    font-size: 12px;
                     font-weight: 600;
                     cursor: pointer;
                     transition: all .15s ease;
@@ -883,7 +926,7 @@ export default function CustomDateTimePicker({
                     box-shadow: 0 2px 6px rgba(31, 122, 99, 0.35);
                 }
                 .cdp-month-label {
-                    font-size: 14.5px;
+                    font-size: 13.5px;
                     font-weight: 700;
                     color: #103323;
                     text-transform: capitalize;
@@ -895,14 +938,14 @@ export default function CustomDateTimePicker({
                 .cdp-arrow-btn {
                     display: grid;
                     place-items: center;
-                    width: 28px;
-                    height: 28px;
+                    width: 25px;
+                    height: 25px;
                     border: none;
                     background: transparent;
                     color: #4b6357;
                     border-radius: 6px;
                     cursor: pointer;
-                    font-size: 12px;
+                    font-size: 11px;
                     transition: background .12s ease, color .12s ease;
                 }
                 .cdp-arrow-btn:hover {
@@ -913,27 +956,27 @@ export default function CustomDateTimePicker({
                     display: grid;
                     grid-template-columns: repeat(7, 1fr);
                     text-align: center;
-                    font-size: 11.5px;
+                    font-size: 10.5px;
                     font-weight: 700;
                     color: #72867c;
-                    margin-bottom: 2px;
+                    margin-bottom: 1px;
                 }
                 .cdp-weekday {
-                    padding: 4px 0;
+                    padding: 2px 0;
                 }
                 .cdp-days {
                     display: grid;
                     grid-template-columns: repeat(7, 1fr);
-                    gap: 3px;
+                    gap: 2px;
                 }
                 .cdp-day-btn {
                     display: grid;
                     place-items: center;
-                    height: 32px;
+                    height: 27px;
                     border: none;
                     background: transparent;
-                    border-radius: 8px;
-                    font-size: 13px;
+                    border-radius: 6px;
+                    font-size: 12px;
                     font-weight: 500;
                     color: #103323;
                     cursor: pointer;
@@ -958,25 +1001,25 @@ export default function CustomDateTimePicker({
                 }
                 .cdp-time-pane {
                     border-left: 1px solid rgba(0, 0, 0, 0.08);
-                    padding-left: 14px;
+                    padding-left: 10px;
                 }
                 .cdp-time-columns {
                     display: flex;
-                    gap: 6px;
-                    height: 228px;
+                    gap: 5px;
+                    height: 184px;
                 }
                 .cdp-time-col {
                     display: flex;
                     flex-direction: column;
-                    gap: 4px;
-                    width: 52px;
+                    gap: 3px;
+                    width: 46px;
                     overflow-y: auto;
-                    max-height: 228px;
+                    max-height: 184px;
                     padding-right: 2px;
                     scrollbar-width: thin;
                 }
                 .cdp-period-col {
-                    width: 58px;
+                    width: 50px;
                 }
                 .cdp-time-col::-webkit-scrollbar {
                     width: 4px;
@@ -989,13 +1032,13 @@ export default function CustomDateTimePicker({
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    height: 30px;
-                    min-height: 30px;
+                    height: 26px;
+                    min-height: 26px;
                     border: none;
                     background: #f5f8f6;
                     color: #103323;
-                    border-radius: 7px;
-                    font-size: 13px;
+                    border-radius: 6px;
+                    font-size: 12px;
                     font-weight: 600;
                     cursor: pointer;
                     transition: background .12s ease, color .12s ease;
@@ -1013,18 +1056,18 @@ export default function CustomDateTimePicker({
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
-                    padding-top: 8px;
+                    padding-top: 6px;
                     border-top: 1px solid rgba(0, 0, 0, 0.07);
-                    margin-top: 2px;
+                    margin-top: 1px;
                 }
                 .cdp-btn-clear {
                     border: none;
                     background: transparent;
                     color: #b3261e;
-                    font-size: 13px;
+                    font-size: 12px;
                     font-weight: 700;
                     cursor: pointer;
-                    padding: 6px 8px;
+                    padding: 4px 6px;
                     border-radius: 6px;
                     transition: background .12s ease;
                 }
@@ -1034,16 +1077,16 @@ export default function CustomDateTimePicker({
                 .cdp-footer-right {
                     display: flex;
                     align-items: center;
-                    gap: 8px;
+                    gap: 6px;
                 }
                 .cdp-btn-today {
                     border: none;
                     background: transparent;
                     color: #1f7a63;
-                    font-size: 13px;
+                    font-size: 12px;
                     font-weight: 700;
                     cursor: pointer;
-                    padding: 6px 10px;
+                    padding: 4px 8px;
                     border-radius: 6px;
                     transition: background .12s ease;
                 }
@@ -1054,11 +1097,14 @@ export default function CustomDateTimePicker({
                     border: none;
                     background: #1f7a63;
                     color: #ffffff;
-                    font-size: 13px;
+                    font-size: 12px;
                     font-weight: 700;
                     cursor: pointer;
-                    padding: 6px 14px;
-                    border-radius: 8px;
+                    padding: 5px 12px;
+                    border-radius: 6px;
+                    box-shadow: 0 2px 6px rgba(31, 122, 99, 0.3);
+                    transition: background .15s ease, transform .12s ease;
+                }
                     box-shadow: 0 2px 6px rgba(31, 122, 99, 0.3);
                     transition: background .15s ease, transform .12s ease;
                 }

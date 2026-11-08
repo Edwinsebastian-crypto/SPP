@@ -64,10 +64,11 @@ function renderBody(content) {
  */
 function renderEmail({ subject, content, tipo }) {
   const d = DISEÑO;
-  const useUrl = /^https:\/\//i.test(d.logoUrl);
+  const logoUrlCandidate = d.logoUrl || (env.appUrl ? `${env.appUrl.replace(/\/+$/, '')}/img/logo-email.png` : '');
+  const useUrl = /^https?:\/\//i.test(logoUrlCandidate);
   const hasLogo = !useUrl && fs.existsSync(LOGO.archivo);
   const etiqueta = ETIQUETAS[tipo] || ETIQUETA_POR_DEFECTO;
-  const logoSrc = useUrl ? escapeHtml(d.logoUrl) : `cid:${LOGO.cid}`;
+  const logoSrc = useUrl ? escapeHtml(logoUrlCandidate) : `cid:${LOGO.cid}`;
   const logoCell = (useUrl || hasLogo)
     ? `<td style="padding:0 12px 0 0;vertical-align:middle"><img src="${logoSrc}" alt="SPP" height="${LOGO.altoPx}" style="display:block;height:${LOGO.altoPx}px;width:auto;border:0"></td>`
     : '';
