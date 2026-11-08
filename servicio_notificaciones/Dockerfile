@@ -4,6 +4,7 @@ RUN apk add --no-cache tzdata
 WORKDIR /srv
 COPY package*.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
+COPY assets ./assets
 COPY src ./src
 USER node
 EXPOSE 4000

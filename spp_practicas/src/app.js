@@ -23,6 +23,9 @@ function createApp(container = createContainer()) {
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
 
+  // Health check endpoint (for reverse proxy, Docker, or monitoring)
+  app.get('/healthz', (_req, res) => res.json({ status: 'ok' }));
+
   // Pages first, so /pages/*.html is never served without a session
   app.use(createPagesRouter(container));
   app.use('/api/internal', createInternalRouter(container));

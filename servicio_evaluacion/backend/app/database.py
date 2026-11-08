@@ -11,8 +11,14 @@ class Base(DeclarativeBase):
 
 _settings = get_settings()
 
-_connect_args = {"check_same_thread": False} if _settings.database_url.startswith("sqlite") else {}
-engine = create_engine(_settings.database_url, pool_pre_ping=True, connect_args=_connect_args)
+db_url = _settings.database_url
+if db_url.startswith("postgres://"):
+    db_url = "postgresql+psycopg://" + db_url[len("postgres://"):]
+elif db_url.startswith("postgresql://") and not db_url.startswith("postgresql+"):
+    db_url = "postgresql+psycopg://" + db_url[len("postgresql://"):]
+
+_connect_args = {"check_same_thread": False} if db_url.startswith("sqlite") else {}
+engine = create_engine(db_url, pool_pre_ping=True, connect_args=_connect_args)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 

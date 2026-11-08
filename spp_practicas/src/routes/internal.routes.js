@@ -50,13 +50,13 @@ function createInternalRoutes({ internalController }) {
   router.get('/verificar', asyncHandler(internalController.verifyBelongs));
 
   // --- servicio_notificaciones ---
-  router.get('/notifications/persons/:role/:documentNumber', asyncHandler(internalController.getPerson));
-  router.get('/notifications/directors/active', asyncHandler(internalController.listActiveDirectors));
-  router.get('/notifications/practices/:practiceId', asyncHandler(internalController.getPractice));
-  router.get('/notifications/activities/:activityId', asyncHandler(internalController.getActivityNotification));
   router.get('/notifications/activities/due-soon', asyncHandler(internalController.listActivitiesDueSoon));
   router.get('/notifications/activities/awaiting-review', asyncHandler(internalController.listActivitiesAwaitingReview));
   router.get('/notifications/practices/ungraded', asyncHandler(internalController.listUngradedPractices));
+  router.get('/notifications/directors/active', asyncHandler(internalController.listActiveDirectors));
+  router.get('/notifications/persons/:role/:documentNumber', asyncHandler(internalController.getPerson));
+  router.get('/notifications/practices/:practiceId', asyncHandler(internalController.getPractice));
+  router.get('/notifications/activities/:activityId', asyncHandler(internalController.getActivityNotification));
 
   return router;
 }
