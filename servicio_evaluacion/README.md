@@ -1,6 +1,6 @@
 # Microservicio de Evaluación · SPP
 
-Microservicio asíncrono desarrollado en **Python (FastAPI + SQLAlchemy)** encargado de la creación, gestión, presentación y calificación de evaluaciones académicas en el Sistema de Prácticas Pedagógicas (SPP). Cuenta con soporte para preguntas manuales y un motor de **generación de cuestionarios asistido por Inteligencia Artificial (IA)** a partir de temas libres o evidencias reales de los estudiantes.
+Microservicio asíncrono desarrollado en **Python (FastAPI + SQLAlchemy)** encargado de la creación, gestión, presentación y calificación de evaluaciones académicas en el Software de Prácticas Pedagógicas (SPP). Cuenta con soporte para preguntas manuales y un motor de **generación de cuestionarios asistido por Inteligencia Artificial (IA)** a partir de temas libres o evidencias reales de los estudiantes.
 
 ---
 

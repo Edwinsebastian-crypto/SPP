@@ -91,7 +91,7 @@ graph TD
 
 ## 🔄 Transacciones: Atomicidad (ACID) vs. Consistencia Eventual
 
-El sistema utiliza un modelo de concurrencia y persistencia híbrido adaptado a la naturaleza distribuida de la plataforma:
+El software utiliza un modelo de concurrencia y persistencia híbrido adaptado a la naturaleza distribuida de la plataforma:
 
 ### 1. Atomicidad Estricta (ACID) — Persistencia Local
 Aplica en operaciones críticas que involucran integridad de datos relacionales en **PostgreSQL**:
@@ -213,7 +213,7 @@ SPP/
 
 ---
 
-## 👥 Roles del Sistema y Control de Acceso (RBAC)
+## 👥 Roles del Software y Control de Acceso (RBAC)
 
 1. **Estudiante (`student`)**:
    - Consulta de información de su práctica asignada y porcentaje de avance en horas.

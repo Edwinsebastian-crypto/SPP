@@ -1,6 +1,6 @@
 # Microservicio de Notificaciones · SPP
 
-Microservicio asíncrono desarrollado en **Node.js 18+ (Express)** encargado del despacho centralizado de **notificaciones por correo electrónico** y del suministro de la **bandeja de notificaciones en tiempo real (campana)** para el Sistema de Prácticas Pedagógicas (SPP).
+Microservicio asíncrono desarrollado en **Node.js 18+ (Express)** encargado del despacho centralizado de **notificaciones por correo electrónico** y del suministro de la **bandeja de notificaciones en tiempo real (campana)** para el Software de Prácticas Pedagógicas (SPP).
 
 Utiliza **MongoDB** como almacén persistente de la cola y el historial de notificaciones, y **Nodemailer** para la entrega de correos mediante protocolo SMTP con plantillas HTML responsivas.
 
@@ -145,7 +145,7 @@ docker compose up --build -d
    SMTP_SECURE=false
    SMTP_USER=tu_correo@institucion.edu.co
    SMTP_PASS=tu_contrasena_de_aplicacion
-   MAIL_FROM="Sistema SPP <no-reply@institucion.edu.co>"
+   MAIL_FROM="Software SPP <no-reply@institucion.edu.co>"
    
    # Modo de envío: 'smtp' para envío real, 'log' para imprimir en consola sin enviar
    MAIL_MODE=smtp

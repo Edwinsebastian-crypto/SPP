@@ -1,4 +1,4 @@
-# Monolito SPP · Sistema de Prácticas Pedagógicas
+# Monolito SPP · Software de Prácticas Pedagógicas
 
 Servicio central del ecosistema SPP encargado de la gestión integral, seguimiento pedagógico, registro de actividades y control administrativo de las prácticas académicas universitarias.
 
@@ -8,7 +8,7 @@ Construido en **Node.js 18+ (Express)** con frontend reactivo en **React 19 + Vi
 
 ## 🎯 ¿Qué hace este servicio?
 
-El monolito es el núcleo transaccional del sistema y coordina todo el ciclo de vida de la práctica pedagógica:
+El monolito es el núcleo transaccional del software y coordina todo el ciclo de vida de la práctica pedagógica:
 
 1. **Gestión de Prácticas y Matrículas**:
    - Registro y vinculación entre estudiante, tutor académico, asesor de la institución educativa y director de programa.
@@ -80,7 +80,7 @@ spp_practicas/
 │   ├── server.js            # Punto de entrada principal y levantamiento del servidor HTTP
 │   ├── app.js               # Ensamblado de Express, middlewares globales y rutas
 │   ├── container.js         # Contenedor de inyección de dependencias
-│   ├── config/              # Variables de entorno validadas y constantes del sistema
+│   ├── config/              # Variables de entorno validadas y constantes del software
 │   ├── routes/              # Declaración de endpoints protegidos por guardas de rol
 │   ├── controllers/         # Controladores HTTP de entrada y salida
 │   ├── services/            # Casos de uso y reglas de negocio del dominio
@@ -112,7 +112,7 @@ spp_practicas/
 ## 🔒 Mecanismos de Seguridad
 
 - **Sesiones y Cookies**: Cookies `HttpOnly`, con atributos `SameSite=Lax` y bandera `Secure` en producción.
-- **Validación de Identidad**: Integración con Supabase Auth restringida a cuentas creadas por el sistema institucional.
+- **Validación de Identidad**: Integración con Supabase Auth restringida a cuentas creadas por el software institucional.
 - **Protección contra Inyecciones**: Todas las consultas a PostgreSQL utilizan consultas SQL parametrizadas (`$1, $2, ...`).
 - **Políticas de Contenido (CSP)**: Cabeceras `Content-Security-Policy` estrictas sin scripts inline arbitrarios.
 - **Control de Carga de Archivos**: Validación de tipos MIME y límite de tamaño a 10 MB antes del procesamiento hacia Cloudinary.
