@@ -1039,18 +1039,7 @@ body.dark-theme .feedback-content {
 .feedback-textarea:focus {
   outline: none;
   border-color: #1a6b50;
-}
-
-/* Borde dorado permanente en el textarea del modal "Asignar Actividad" (modo claro) */
-.am-form .feedback-textarea {
-  border: 2px solid var(--clr-accent-gold);
-  box-shadow: 0 0 0 1px rgba(221, 163, 38, 0.25);
-}
-
-.am-form .feedback-textarea:focus {
-  border-color: var(--clr-accent-gold);
-  box-shadow: 0 0 0 3px rgba(221, 163, 38, 0.3);
-  outline: none;
+  box-shadow: 0 0 0 2px rgba(26, 107, 80, 0.15);
 }
 
 body.dark-theme .feedback-textarea {
@@ -1063,15 +1052,8 @@ body.dark-theme .feedback-textarea::placeholder {
   color: rgba(26, 66, 49, 0.7);
 }
 
-/* Borde dorado en modo oscuro para el modal "Asignar Actividad" */
-body.dark-theme .am-form .feedback-textarea {
-  border: 2px solid var(--clr-accent-gold);
-  box-shadow: 0 0 0 1px rgba(221, 163, 38, 0.3);
-}
-
-body.dark-theme .am-form .feedback-textarea:focus {
-  border-color: var(--clr-accent-gold);
-  box-shadow: 0 0 0 3px rgba(221, 163, 38, 0.35);
+body.dark-theme .feedback-textarea:focus {
+  border-color: #1a4231;
 }
 
 .feedback-actions {

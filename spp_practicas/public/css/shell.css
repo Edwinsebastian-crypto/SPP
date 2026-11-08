@@ -164,13 +164,19 @@ textarea:focus {
 
 button:focus-visible,
 a:focus-visible,
-select:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
 [role="button"]:focus-visible,
 [role="tab"]:focus-visible {
-   outline: 2px solid var(--clr-accent-gold) !important;
+   outline: 2px solid var(--clr-accent-gold);
    outline-offset: 2px;
+}
+
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible {
+   outline: none !important;
 }
 
 /* Quitar el fondo azul/amarillo por defecto del navegador en inputs autocompletados.
