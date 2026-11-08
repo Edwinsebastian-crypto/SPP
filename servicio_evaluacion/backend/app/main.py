@@ -40,3 +40,8 @@ API = "/api/v1"
 for r in (meta.router, tutor_evaluaciones.router, tutor_preguntas.router, tutor_generacion.router,
           tutor_resultados.router, estudiante.router, director.router, internal.router):
     app.include_router(r, prefix=API)
+
+
+@app.get("/")
+def root():
+    return {"status": "ok", "service": "spp-servicio-evaluacion", "health": "/api/v1/health", "docs": "/docs"}
