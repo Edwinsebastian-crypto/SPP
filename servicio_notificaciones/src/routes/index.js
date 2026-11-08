@@ -8,6 +8,7 @@ const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).cat
 /** /health (público) y /api/v1/* (solo el monolito, con token firmado). */
 function createRoutes({ eventService, jobs, dispatcher, notificationRepository, auth, health }) {
   const router = express.Router();
+  router.get('/', wrap(async (_req, res) => res.json(await health())));
   router.get('/health', wrap(async (_req, res) => res.json(await health())));
 
   const api = express.Router();
